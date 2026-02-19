@@ -1,0 +1,31 @@
+{
+  "name": "@ai-dashboard/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.0.0",
+    "@libsql/client": "^0.14.0",
+    "@opencode-ai/sdk": "latest",
+    "dotenv": "^17.3.1",
+    "drizzle-orm": "^0.40.0",
+    "hono": "^4.0.0",
+    "nanoid": "^5.0.0",
+    "ws": "^8.0.0",
+    "zod": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/ws": "^8.18.1",
+    "drizzle-kit": "^0.30.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Turso local replica
+*.db
+*.db-journal
+
+# AI Dashboard specific
+packages/server/src/db/migrations/
+packages/client/dist/
+.turbo/
+
+# Temporary
+tmp/
+temp/
+*.tmp

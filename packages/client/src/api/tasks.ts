@@ -1,0 +1,77 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { apiClient, apiClientText } from "./client"
+import type { Task, TaskInput, TaskFilters, TaskStatusType } from "../types/task"
+
+export function useTasks(filters: TaskFilters = {}) {
+  const params = new URLSearchParams()
+  if (filters.status) params.set("status", filters.status)
+  if (filters.personaId) params.set("personaId", filters.personaId)
+  if (filters.priority !== undefined) params.set("priority", String(filters.priority))
+  
+  const queryString = params.toString()
+  const path = queryString ? `/api/tasks?${queryString}` : "/api/tasks"
+  
+  return useQuery({
+    queryKey: ["tasks", filters],
+    queryFn: () => apiClient<Task[]>(path),
+    staleTime: 5_000,
+    refetchInterval: 5_000,
+  })
+}
+
+export function useTask(id: string) {
+  return useQuery({
+    queryKey: ["task", id],
+    queryFn: () => apiClient<Task>(`/api/tasks/${id}`),
+    staleTime: 3_000,
+    refetchInterval: 3_000,
+  })
+}
+
+export function useCreateTask() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: TaskInput) =>
+      apiClient<Task>("/api/tasks", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+    },
+  })
+}
+
+export function useUpdateTaskStatus() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      status,
+      reviewedBy,
+      reviewNote,
+    }: {
+      id: string
+      status: TaskStatusType
+      reviewedBy?: string
+      reviewNote?: string
+    }) =>
+      apiClient<Task>(`/api/tasks/${id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status, reviewedBy, reviewNote }),
+      }),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ["task", id] })
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+    },
+  })
+}
+
+export function useTaskDiff(id: string, enabled = false) {
+  return useQuery({
+    queryKey: ["task-diff", id],
+    queryFn: () => apiClientText(`/api/tasks/${id}/diff`),
+    staleTime: Infinity,
+    enabled,
+  })
+}
