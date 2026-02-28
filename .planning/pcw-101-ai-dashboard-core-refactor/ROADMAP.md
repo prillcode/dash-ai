@@ -7,7 +7,7 @@
 ## Phases
 
 ### Phase 01: SQLite Migration
-**Status:** 📋 Planned
+**Status:** ✅ Complete
 
 **Goals:**
 - Remove Turso/libSQL dependency entirely
@@ -23,7 +23,7 @@
 ---
 
 ### Phase 02: Task State Machine Redesign
-**Status:** 📋 Planned
+**Status:** ✅ Complete
 
 **Goals:**
 - Replace current 7-state machine with new 9-state planning-first machine:
@@ -42,7 +42,7 @@
 ---
 
 ### Phase 03: Projects System
-**Status:** 📋 Planned
+**Status:** 🔄 In Progress (03-01 ✅ complete; 03-02, 03-03, 03-04 planned, not yet executed)
 
 **Goals:**
 - New `projects` table: `{ id, name, description, path, isActive }`
@@ -54,33 +54,34 @@
 - Sidebar: add Projects link between Personas and Monitor placeholder
 
 **Plans:**
-- `03-01` — Schema + service + routes (server only)
-- `03-02` — Client: API hooks + ProjectSelector component
-- `03-03` — Client: ProjectListPage + ProjectFormPage + Sidebar + App router
+- `03-01` ✅ — Persona provider/model picker + type presets (executed + committed)
+- `03-02` 📋 — Server: projects table + projectService + routes/projects.ts
+- `03-03` 📋 — Client: types + API hooks + ProjectSelector + TaskForm update
+- `03-04` 📋 — Client: ProjectListPage + ProjectFormPage + Sidebar + App router
 
 ---
 
 ### Phase 04: Planning Workflow Integration
-**Status:** 📋 Planned
+**Status:** 📋 Planned — all plans written, ready for execution
 
 **Goals:**
 - `sessionRunner.ts` planning mode: when task is `IN_PLANNING`, run `/start-work` + `/create-plans` (not `/run-plan`)
-- Planning session resolves project path, `cd`s into repo, invokes skill stack via OpenCode
+- Planning session resolves project path, `cd`s into repo, invokes skill stack via OpenCode SDK
 - Plan docs saved to `[projectPath]/.planning/[planPath]/` (BRIEF.md, ROADMAP.md, PLAN.md files)
 - Coding mode: when task is `READY_TO_CODE`, run `/run-plan` on the appropriate PLAN.md
-- Provider auth error detection: catch OpenCode auth failures, set task FAILED with clear message
+- Provider auth error detection: catch auth failures, set task FAILED with clear message
 - Server startup check: warn if `~/.agents/skills/start-work/` is not installed
 - `queueWorker` updated: separate handlers for planning vs coding task types
 
 **Plans:**
-- `04-01` — sessionRunner planning mode: `/start-work` + `/create-plans` integration
-- `04-02` — sessionRunner coding mode: `/run-plan` integration + auth error handling
-- `04-03` — queueWorker: separate planning vs coding dispatch + startup skill check
+- `04-01` 📋 — planningRunner.ts: SDK/CLI integration + startup skill check + queueWorker planning dispatch
+- `04-02` 📋 — codingRunner.ts: /run-plan integration + auth error detection; sessionRunner refactor
+- `04-03` 📋 — Task routes: start-planning, iterate-plan, plan-doc API endpoints
 
 ---
 
 ### Phase 05: Planning UI
-**Status:** 📋 Planned
+**Status:** 📋 Planned — all plans written, ready for execution
 
 **Goals:**
 - `TaskDetailPage` planning section: visible when task is `IN_PLANNING`, `PLANNED`, or `READY_TO_CODE`
@@ -90,32 +91,29 @@
   - `IN_PLANNING` → auto, set by AI when done
   - `PLANNED` → "Iterate Plan" button (shows feedback textarea) + "Mark Ready to Code" button
   - "Iterate Plan" submits feedback text → saves to `planFeedback` field → sets status back to `IN_PLANNING`
-  - `READY_TO_CODE` → "Start Coding" button (manual trigger or auto via queue)
+  - `READY_TO_CODE` → auto via queue
 - Dual persona selector on `TaskCreatePage`: Planning Persona + Coding Persona dropdowns
-- New API endpoint: `GET /api/tasks/:id/plan-doc?file=BRIEF.md` — reads file from project repo and returns content
 
 **Plans:**
-- `05-01` — Backend: plan-doc API endpoint + task update routes for new state transitions
-- `05-02` — Frontend: dual persona selector on TaskCreatePage
-- `05-03` — Frontend: TaskDetailPage planning section (markdown viewers + state controls)
-- `05-04` — Frontend: "Iterate Plan" flow (feedback textarea + submit → IN_PLANNING)
+- `05-01` 📋 — Client: planning API hooks + TaskForm dual-persona dropdowns + PlanningSection stub
+- `05-02` 📋 — Client: PlanDocViewer markdown rendering + action buttons (Start Planning, Mark Ready to Code)
+- `05-03` 📋 — Client: IteratePlanForm + human verification checkpoint
 
 ---
 
 ### Phase 06: Setup, Portability & Documentation
-**Status:** 📋 Planned
+**Status:** 📋 Planned — all plans written, ready for execution
 
 **Goals:**
 - README complete rewrite: planning-first workflow, Projects setup, skill stack prerequisites, SQLite setup, PM2 deployment
 - `.env.example` cleanup: only SQLite vars, clear comments
 - `AGENTS.md` update: reflect current stack and conventions
-- `install.md` or setup section: step-by-step first-run guide including `npx @prillcode/start-work`
-- Update `00_FLOW-CHART.md` + `00_USE-CASES.md` in `.planning/` to reflect new workflow
 - `pnpm build` clean pass — zero TS errors across client + server
+- ISSUES.md for any deferred items
 
 **Plans:**
-- `06-01` — README rewrite + `.env.example` + `AGENTS.md` updates
-- `06-02` — Final build verification + any lingering TypeScript fixes
+- `06-01` 📋 — README rewrite + `.env.example` + `AGENTS.md` updates
+- `06-02` 📋 — Final build verification + TypeScript fixes + startup smoke test + human checkpoint
 
 ---
 
