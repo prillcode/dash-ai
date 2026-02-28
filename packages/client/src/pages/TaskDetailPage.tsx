@@ -59,9 +59,15 @@ export function TaskDetailPage() {
             <h2 className="font-semibold mb-3">Details</h2>
             <dl className="space-y-2">
               <div>
-                <dt className="text-sm text-gray-500">Persona</dt>
-                <dd className="font-medium">{task.personaName}</dd>
+                <dt className="text-sm text-gray-500">Coding Persona</dt>
+                <dd className="font-medium">{task.codingPersonaName}</dd>
               </div>
+              {task.planningPersonaName && (
+                <div>
+                  <dt className="text-sm text-gray-500">Planning Persona</dt>
+                  <dd className="font-medium">{task.planningPersonaName}</dd>
+                </div>
+              )}
               <div>
                 <dt className="text-sm text-gray-500">Priority</dt>
                 <dd>

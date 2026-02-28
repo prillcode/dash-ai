@@ -1,5 +1,8 @@
 export const TaskStatus = {
-  PENDING: "PENDING",
+  DRAFT: "DRAFT",
+  IN_PLANNING: "IN_PLANNING",
+  PLANNED: "PLANNED",
+  READY_TO_CODE: "READY_TO_CODE",
   QUEUED: "QUEUED",
   RUNNING: "RUNNING",
   AWAITING_REVIEW: "AWAITING_REVIEW",
@@ -15,12 +18,16 @@ export interface Task {
   id: string
   title: string
   description: string
-  personaId: string
-  personaName: string
+  codingPersonaId: string
+  codingPersonaName: string
+  planningPersonaId: string | null
+  planningPersonaName: string | null
   status: TaskStatusType
   priority: number
   repoPath: string
   targetFiles: string[]
+  planFeedback: string | null
+  planPath: string | null
   sessionId: string | null
   outputLog: string | null
   diffPath: string | null
@@ -36,7 +43,8 @@ export interface Task {
 export interface TaskInput {
   title: string
   description: string
-  personaId: string
+  codingPersonaId: string
+  planningPersonaId?: string
   repoPath: string
   targetFiles?: string[]
   priority?: number

@@ -10,8 +10,10 @@ type NewTask = typeof tasks.$inferInsert
 export interface TaskInput {
   title: string
   description: string
-  personaId: string
-  personaName: string
+  codingPersonaId: string
+  codingPersonaName: string
+  planningPersonaId?: string
+  planningPersonaName?: string
   repoPath: string
   targetFiles?: string[]
   priority?: number
@@ -43,7 +45,7 @@ export async function listTasks(filters: TaskFilters = {}): Promise<Task[]> {
     conditions.push(eq(tasks.status, filters.status))
   }
   if (filters.personaId) {
-    conditions.push(eq(tasks.personaId, filters.personaId))
+    conditions.push(eq(tasks.codingPersonaId, filters.personaId))
   }
   if (filters.priority !== undefined) {
     conditions.push(eq(tasks.priority, filters.priority))
@@ -76,9 +78,11 @@ export async function createTask(input: TaskInput): Promise<Task> {
     id,
     title: input.title,
     description: input.description,
-    personaId: input.personaId,
-    personaName: input.personaName,
-    status: TaskStatus.PENDING,
+    codingPersonaId: input.codingPersonaId,
+    codingPersonaName: input.codingPersonaName,
+    planningPersonaId: input.planningPersonaId ?? null,
+    planningPersonaName: input.planningPersonaName ?? null,
+    status: TaskStatus.DRAFT,
     priority: input.priority ?? 3,
     repoPath: input.repoPath,
     targetFiles: serialized.targetFiles,
@@ -92,7 +96,7 @@ export async function createTask(input: TaskInput): Promise<Task> {
 export async function updateTaskStatus(
   id: string,
   status: string,
-  extra?: Partial<Pick<Task, "diffPath" | "outputLog" | "sessionId" | "errorMessage" | "reviewedBy" | "reviewNote" | "startedAt" | "completedAt">>
+  extra?: Partial<Pick<Task, "diffPath" | "outputLog" | "sessionId" | "errorMessage" | "reviewedBy" | "reviewNote" | "startedAt" | "completedAt" | "planFeedback" | "planPath" | "planningPersonaId" | "planningPersonaName">>
 ): Promise<Task | null> {
   const [row] = await db.update(tasks)
     .set({
@@ -106,13 +110,13 @@ export async function updateTaskStatus(
   return row ? parseTask(row) : null
 }
 
-export async function claimNextPendingTask(): Promise<Task | null> {
+export async function claimNextReadyTask(): Promise<Task | null> {
   const [row] = await db.update(tasks)
     .set({ status: TaskStatus.QUEUED, updatedAt: now() })
     .where(eq(tasks.id, db
       .select({ id: tasks.id })
       .from(tasks)
-      .where(eq(tasks.status, TaskStatus.PENDING))
+      .where(eq(tasks.status, TaskStatus.READY_TO_CODE))
       .orderBy(asc(tasks.priority), asc(tasks.createdAt))
       .limit(1)
     ))
@@ -121,10 +125,13 @@ export async function claimNextPendingTask(): Promise<Task | null> {
   return row ? parseTask(row) : null
 }
 
+// Keep old name as alias for backward compatibility during transition
+export const claimNextPendingTask = claimNextReadyTask
+
 export async function resetStuckTasks(): Promise<number> {
   const result = await db.update(tasks)
-    .set({ status: TaskStatus.PENDING, updatedAt: now() })
-    .where(inArray(tasks.status, [TaskStatus.QUEUED, TaskStatus.RUNNING]))
+    .set({ status: TaskStatus.DRAFT, updatedAt: now() })
+    .where(inArray(tasks.status, [TaskStatus.IN_PLANNING, TaskStatus.QUEUED, TaskStatus.RUNNING]))
     .returning()
   
   return result.length

@@ -8,7 +8,8 @@ import type { TaskInput } from "../../types/task"
 const taskSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
-  personaId: z.string().min(1, "Persona is required"),
+  codingPersonaId: z.string().min(1, "Coding persona is required"),
+  planningPersonaId: z.string().optional(),
   repoPath: z.string().min(1, "Repository path is required"),
   targetFiles: z.array(z.string()).optional(),
   priority: z.number().min(1).max(5).optional(),
@@ -31,7 +32,8 @@ export function TaskForm({ initialData, onSubmit, isLoading }: TaskFormProps) {
     defaultValues: {
       title: initialData?.title || "",
       description: initialData?.description || "",
-      personaId: initialData?.personaId || "",
+      codingPersonaId: initialData?.codingPersonaId || "",
+      planningPersonaId: initialData?.planningPersonaId || "",
       repoPath: initialData?.repoPath || "",
       targetFiles: initialData?.targetFiles || [],
       priority: initialData?.priority ?? 3,
@@ -55,12 +57,20 @@ export function TaskForm({ initialData, onSubmit, isLoading }: TaskFormProps) {
         rows={6}
       />
       <div className="space-y-1">
-        <label className="block text-sm font-medium text-gray-700">Persona</label>
+        <label className="block text-sm font-medium text-gray-700">Coding Persona</label>
         <PersonaSelector
-          value={initialData?.personaId}
-          onChange={(id, _name) => setValue("personaId", id)}
+          value={initialData?.codingPersonaId}
+          onChange={(id, _name) => setValue("codingPersonaId", id)}
         />
-        {errors.personaId && <p className="text-sm text-red-600">{errors.personaId.message}</p>}
+        {errors.codingPersonaId && <p className="text-sm text-red-600">{errors.codingPersonaId.message}</p>}
+      </div>
+      <div className="space-y-1">
+        <label className="block text-sm font-medium text-gray-700">Planning Persona (optional)</label>
+        <PersonaSelector
+          value={initialData?.planningPersonaId}
+          onChange={(id, _name) => setValue("planningPersonaId", id)}
+        />
+        {errors.planningPersonaId && <p className="text-sm text-red-600">{errors.planningPersonaId.message}</p>}
       </div>
       <FormField
         label="Repository Path"

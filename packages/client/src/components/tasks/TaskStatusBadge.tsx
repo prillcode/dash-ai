@@ -6,7 +6,10 @@ interface TaskStatusBadgeProps {
 }
 
 const statusColors: Record<TaskStatusType, "gray" | "blue" | "yellow" | "green" | "red" | "purple"> = {
-  [TaskStatus.PENDING]: "gray",
+  [TaskStatus.DRAFT]: "gray",
+  [TaskStatus.IN_PLANNING]: "blue",
+  [TaskStatus.PLANNED]: "purple",
+  [TaskStatus.READY_TO_CODE]: "blue",
   [TaskStatus.QUEUED]: "blue",
   [TaskStatus.RUNNING]: "yellow",
   [TaskStatus.AWAITING_REVIEW]: "purple",
@@ -17,12 +20,12 @@ const statusColors: Record<TaskStatusType, "gray" | "blue" | "yellow" | "green" 
 }
 
 export function TaskStatusBadge({ status }: TaskStatusBadgeProps) {
-  const isRunning = status === TaskStatus.RUNNING
+  const isActive = status === TaskStatus.RUNNING || status === TaskStatus.IN_PLANNING
 
   return (
     <Badge
       color={statusColors[status]}
-      className={isRunning ? "animate-pulse" : ""}
+      className={isActive ? "animate-pulse" : ""}
     >
       {status}
     </Badge>

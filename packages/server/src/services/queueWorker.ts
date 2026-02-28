@@ -11,10 +11,10 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function runTaskSession(task: { id: string; title: string; description: string; repoPath: string; personaId: string }) {
-  const persona = await personaService.getPersona(task.personaId)
+async function runTaskSession(task: { id: string; title: string; description: string; repoPath: string; codingPersonaId: string }) {
+  const persona = await personaService.getPersona(task.codingPersonaId)
   if (!persona) {
-    await taskService.markTaskFailed(task.id, "Persona not found")
+    await taskService.markTaskFailed(task.id, "Coding persona not found")
     return
   }
 
@@ -50,19 +50,19 @@ export async function startQueueWorker() {
 
   const resetCount = await taskService.resetStuckTasks()
   if (resetCount > 0) {
-    console.log(`Reset ${resetCount} stuck tasks to PENDING`)
+    console.log(`Reset ${resetCount} stuck tasks (IN_PLANNING, QUEUED, RUNNING) to DRAFT`)
   }
 
   while (true) {
     try {
       if (activeCount < maxConcurrent) {
-        const task = await taskService.claimNextPendingTask()
+        const task = await taskService.claimNextReadyTask()
 
         if (task) {
           activeCount++
           console.log(`Claimed task ${task.id}: ${task.title}`)
           
-          await eventService.appendEvent(task.id, "STATUS_CHANGE", { from: TaskStatus.PENDING, to: TaskStatus.QUEUED })
+          await eventService.appendEvent(task.id, "STATUS_CHANGE", { from: TaskStatus.READY_TO_CODE, to: TaskStatus.QUEUED })
 
           runTaskSession(task).catch((err) => {
             console.error(`Task ${task.id} failed with error:`, err)

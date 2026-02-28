@@ -11,7 +11,8 @@ export const tasksRouter = new Hono()
 const taskSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
-  personaId: z.string().min(1),
+  codingPersonaId: z.string().min(1),
+  planningPersonaId: z.string().optional(),
   repoPath: z.string().min(1),
   targetFiles: z.array(z.string()).optional(),
   priority: z.number().min(1).max(5).optional(),
@@ -19,9 +20,11 @@ const taskSchema = z.object({
 
 const statusUpdateSchema = z.object({
   status: z.enum([
+    TaskStatus.DRAFT,
+    TaskStatus.PLANNED,
+    TaskStatus.READY_TO_CODE,
     TaskStatus.APPROVED,
     TaskStatus.REJECTED,
-    TaskStatus.PENDING,
     TaskStatus.FAILED,
   ]),
   reviewedBy: z.string().optional(),
@@ -47,14 +50,24 @@ tasksRouter.post("/", async (c) => {
     return c.json({ error: "Validation failed", details: parsed.error.issues }, 400)
   }
   
-  const persona = await personaService.getPersona(parsed.data.personaId)
-  if (!persona) {
-    return c.json({ error: "Persona not found" }, 400)
+  const codingPersona = await personaService.getPersona(parsed.data.codingPersonaId)
+  if (!codingPersona) {
+    return c.json({ error: "Coding persona not found" }, 400)
+  }
+
+  let planningPersonaName: string | undefined
+  if (parsed.data.planningPersonaId) {
+    const planningPersona = await personaService.getPersona(parsed.data.planningPersonaId)
+    if (!planningPersona) {
+      return c.json({ error: "Planning persona not found" }, 400)
+    }
+    planningPersonaName = planningPersona.name
   }
   
   const task = await taskService.createTask({
     ...parsed.data,
-    personaName: persona.name,
+    codingPersonaName: codingPersona.name,
+    planningPersonaName,
   })
   
   return c.json(task, 201)
@@ -89,10 +102,9 @@ tasksRouter.patch("/:id/status", async (c) => {
     return c.json({ error: "Task not found" }, 404)
   }
   
-  await eventService.appendEvent(id, "REVIEW_ACTION", {
-    action: parsed.data.status as "APPROVED" | "REJECTED",
-    reviewedBy: parsed.data.reviewedBy || "unknown",
-    note: parsed.data.reviewNote,
+  await eventService.appendEvent(id, "STATUS_CHANGE", {
+    from: "manual",
+    to: parsed.data.status,
   })
   
   return c.json(task)

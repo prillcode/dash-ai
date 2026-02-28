@@ -21,7 +21,7 @@ export function TaskCard({ task }: TaskCardProps) {
           </div>
           <p className="text-sm text-gray-500 mt-1 line-clamp-2">{task.description}</p>
           <div className="flex items-center gap-2 mt-2">
-            <Badge color="blue">{task.personaName}</Badge>
+            <Badge color="blue">{task.codingPersonaName}</Badge>
             <Badge color="gray">P{task.priority}</Badge>
             {task.targetFiles.slice(0, 2).map((file) => (
               <Badge key={file} color="purple">{file}</Badge>
