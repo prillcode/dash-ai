@@ -2,46 +2,108 @@
 
 End-to-end flow of a coding task from creation to completion.
 
+## Planning-First Flow
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        USER (Browser)                           │
 └─────────────────────────────────────────────────────────────────┘
          │
-         │  1. Select Persona + Fill Task Form
+         │  1. Select Planning Persona + Coding Persona
+         │     Select Project (registered local repo)
+         │     Fill title, description, priority
          ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  TaskCreatePage                                                 │
-│  - Choose persona (Code Reviewer, Refactorer, etc.)             │
-│  - Set title, description, repo path, target files              │
-│  - Set priority                                                 │
+│  - Planning Persona (optional) — type: planner                  │
+│  - Coding Persona (required)   — type: coder                    │
+│  - Project dropdown (replaces free-text repo path)              │
+│  - Title, description, priority                                 │
 └─────────────────────────────────────────────────────────────────┘
          │
          │  POST /api/tasks
          ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  taskService.createTask()                                       │
-│  Status: PENDING                                                │
+│  Status: DRAFT                                                  │
+│  repoPath derived from selected Project (resolvedPath)          │
 └─────────────────────────────────────────────────────────────────┘
          │
-         │  Queue worker polls every 5s
+         │  User clicks "Start Planning" on TaskDetailPage
+         │  POST /api/tasks/:id/start-planning
          ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  queueWorker.claimNextPendingTask()                             │
+│  Status: IN_PLANNING                                            │
+│  queueWorker claims task (sessionId IS NULL guard)              │
+└─────────────────────────────────────────────────────────────────┘
+         │
+         │  Semaphore check (MAX_CONCURRENT_SESSIONS)
+         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  planningRunner.runPlanningSession(task, planningPersona)       │
+│                                                                 │
+│  1. Resolve repoPath (~ expanded via os.homedir())              │
+│  2. Derive planPath slug from task id + title                   │
+│  3. Open OpenCode SDK session in repoPath                       │
+│  4. Inject planningPersona.systemPrompt                         │
+│  5. Prompt: run start-work + create-plans skill stack           │
+│     → scaffolds repoPath/.planning/<planPath>/                  │
+│     → generates BRIEF.md, ROADMAP.md, PLAN.md files            │
+│  6. Stream events → eventService (live in TaskDetailPage)       │
+└─────────────────────────────────────────────────────────────────┘
+         │                          │
+         │                          │  WebSocket broadcast
+         │                          ▼
+         │              ┌───────────────────────┐
+         │              │  TaskDetailPage        │
+         │              │  - Live event stream   │
+         │              │  - PlanningSection     │
+         │              │    "AI is planning..." │
+         │              └───────────────────────┘
+         │
+         │  Planning session ends
+         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Status: PLANNED                                                │
+│  planPath saved on task                                         │
+│                                                                 │
+│  PlanningSection now shows:                                     │
+│  - BRIEF.md viewer  (GET /api/tasks/:id/plan-doc?file=BRIEF.md) │
+│  - ROADMAP.md viewer                                            │
+│  - "Mark Ready to Code" button                                  │
+│  - "Iterate Plan" button                                        │
+└─────────────────────────────────────────────────────────────────┘
+         │
+         │  ┌─────────────────────────────────────────────────┐
+         │  │  User clicks "Iterate Plan"                      │
+         │  │  POST /api/tasks/:id/iterate-plan                │
+         │  │  { feedback: "add more error handling..." }      │
+         │  │  planFeedback saved → Status: IN_PLANNING        │
+         │  │  → loops back to planningRunner (with feedback)  │
+         │  └─────────────────────────────────────────────────┘
+         │
+         │  User clicks "Mark Ready to Code"
+         │  PATCH /api/tasks/:id/status → READY_TO_CODE
+         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Status: READY_TO_CODE                                          │
+│  queueWorker.claimNextReadyTask()                               │
 │  Status: QUEUED  (atomic update, prevents double-claim)         │
 └─────────────────────────────────────────────────────────────────┘
          │
-         │  Semaphore check (MAX_CONCURRENT_SESSIONS=3)
+         │  Semaphore check (MAX_CONCURRENT_SESSIONS)
          ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  sessionRunner.run(task, persona)                               │
+│  codingRunner.runCodingSession(task, codingPersona)             │
 │  Status: RUNNING                                                │
 │                                                                 │
-│  1. createOpencode({ model: persona.model })                    │
-│  2. session.create({ title: task.title })                       │
-│  3. Inject persona.systemPrompt    (noReply)                    │
-│  4. Inject skills in order         (noReply) ◄── Phase 3        │
-│  5. Inject persona.contextFiles    (noReply)                    │
-│  6. session.prompt(task.description)                            │
+│  1. Open OpenCode SDK session in repoPath                       │
+│  2. Inject codingPersona.systemPrompt                           │
+│  3. Prompt: run /run-plan on .planning/<planPath>/              │
+│     → executes first unexecuted PLAN.md (no SUMMARY.md yet)    │
+│  4. Stream events → eventService                                │
+│  5. On completion: git diff HEAD → changes.diff                 │
+│  6. Write log → ~/.ai-dashboard/sessions/<taskId>/session.log   │
 └─────────────────────────────────────────────────────────────────┘
          │                          │
          │                          │  WebSocket broadcast
@@ -53,15 +115,12 @@ End-to-end flow of a coding task from creation to completion.
          │              │  - Agent output        │
          │              └───────────────────────┘
          │
-         │  event.subscribe() stream ends
+         │  Coding session ends
          ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Post-session                                                   │
-│  - file.status() → collect changed files                        │
-│  - Write diff  → DIFF_STORAGE_DIR/<taskId>/changes.diff         │
-│  - Write log   → LOG_STORAGE_DIR/<taskId>/session.log           │
-│  - Record cost → session_costs table          ◄── Phase 2       │
 │  Status: AWAITING_REVIEW                                        │
+│  - diff saved to ~/.ai-dashboard/diffs/<taskId>/changes.diff    │
+│  - log saved to ~/.ai-dashboard/sessions/<taskId>/session.log   │
 └─────────────────────────────────────────────────────────────────┘
          │
          │  Human reviews diff in DiffReviewPanel
@@ -78,29 +137,42 @@ End-to-end flow of a coding task from creation to completion.
          ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Status: COMPLETE                                               │
-│  - Cost recorded in monitor                   ◄── Phase 2       │
-│  - Skills logged for effectiveness            ◄── Phase 3       │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Task Status Pipeline
 
 ```
-PENDING → QUEUED → RUNNING → AWAITING_REVIEW → APPROVED → COMPLETE
-                                             ↘ REJECTED
-                   ↘ FAILED (on error)
+DRAFT → IN_PLANNING ⇄ PLANNED → READY_TO_CODE → QUEUED → RUNNING → AWAITING_REVIEW → APPROVED → COMPLETE
+              ↑           │                                                           ↘ REJECTED
+              └───────────┘
+           (Iterate Plan loop)
+                                    (on error at any stage) → FAILED
+```
+
+## Persona Roles
+
+```
+Planning Persona (type: planner)          Coding Persona (type: coder)
+─────────────────────────────────         ──────────────────────────────
+Model:  claude-opus-4-5 (default)         Model:  claude-sonnet-4-5 (default)
+Tools:  NO bash                           Tools:  bash, read, write, edit, ...
+Phase:  IN_PLANNING                       Phase:  RUNNING
+Output: BRIEF.md + PLAN.md files          Output: code changes + diff
 ```
 
 ## Error Handling
 
 ```
-RUNNING ──► (error thrown in sessionRunner)
+RUNNING / IN_PLANNING ──► (error thrown in runner)
          │
          ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Status: FAILED                                                 │
 │  - errorMessage stored on task                                  │
-│  - server.close() called in finally block (no leaked processes) │
+│  - Auth errors surface a clear message:                         │
+│    "Authentication failed — check ANTHROPIC_API_KEY or          │
+│     edit ~/.ai-dashboard/models.json"                           │
 │  - Task visible in queue with error details                     │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -113,8 +185,25 @@ Server restart detected
          ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  queueWorker startup                                            │
-│  - Finds tasks stuck in QUEUED or RUNNING                       │
-│  - Resets them back to PENDING                                  │
-│  - They re-enter the queue on next poll                         │
+│  - Finds tasks stuck in IN_PLANNING, QUEUED, or RUNNING         │
+│  - Resets them back to DRAFT                                    │
+│  - User can re-trigger planning or coding manually              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Startup Skill Check
+
+```
+Server starts
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  checkSkillsInstalled()                                         │
+│  - Checks ~/.agents/skills/start-work/SKILL.md                  │
+│  - Checks ~/.agents/skills/create-plans/SKILL.md                │
+│                                                                 │
+│  Missing? → console.warn with install instructions              │
+│             Planning tasks will FAIL until installed            │
+│  OK?      → silent, planning ready                              │
 └─────────────────────────────────────────────────────────────────┘
 ```
