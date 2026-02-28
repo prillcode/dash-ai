@@ -1,41 +1,30 @@
 # AI Dashboard
 
-A self-hosted AI Agent Dashboard for managing AI agent personas, submitting coding tasks to a queue, and monitoring task execution in real time via OpenCode SDK integration.
+A self-hosted, planning-first AI kanban board for managing coding tasks across local repos. Submit a task, let an AI planner generate a spec, review and iterate on it, then approve it for coding — all from the dashboard.
 
-## Core Concepts
+## How it works
 
-### Personas
-Personas define how AI agents behave. Each persona includes:
-- **System Prompt**: Instructions that define the agent's role and behavior
-- **Model**: Which AI model to use (e.g., claude-sonnet-4-5)
-- **Allowed Tools**: Which tools the agent can use (bash, read, write, edit)
-- **Context Files**: Files to automatically inject as context for every task
-
-### Task Queue
-Tasks are submitted to a queue and processed by background workers. Each task:
-- Is assigned to a specific persona
-- Has a priority (1-5, 1 being highest)
-- Goes through status transitions: PENDING → QUEUED → RUNNING → AWAITING_REVIEW → APPROVED/REJECTED
-- Can fail and be retried
-
-### OpenCode Integration
-The dashboard uses the OpenCode SDK to execute AI agents. When a task is claimed by the queue worker:
-1. An OpenCode session is created with the persona's model
-2. The system prompt and context files are injected
-3. The task description is sent to the agent
-4. Events are streamed in real-time via WebSocket
-5. Diffs and logs are saved for review
+1. **Register a project** — point the dashboard at a local repo
+2. **Create a task** — describe the work, assign a Planning Persona + Coding Persona
+3. **Start Planning** — the AI runs `start-work` + `create-plans` in your repo, producing BRIEF.md + PLAN.md files in `.planning/`
+4. **Review the plan** — read BRIEF.md and ROADMAP.md directly in the dashboard; iterate with feedback if needed
+5. **Mark Ready to Code** — the coding queue picks it up automatically
+6. **Review the diff** — once the coding session completes, review the diff and approve or reject
 
 ## Prerequisites
 
-- **Node.js** LTS (v20+)
-- **pnpm** (`npm install -g pnpm`)
-- **Turso CLI** (for database management)
-- **OpenCode** installed globally (for agent execution)
+- **Node.js** v22+ (nvm recommended)
+- **pnpm** — `npm install -g pnpm`
+- **OpenCode** installed globally — for AI agent execution
+- **Planning skill stack** (required for Planning mode):
+  ```bash
+  npx @prillcode/start-work
+  ```
+  Installs `start-work` and `create-plans` skills to `~/.agents/skills/`
 
 ## Quick Start
 
-### 1. Clone and Install
+### 1. Clone and install
 
 ```bash
 git clone <repository-url>
@@ -43,157 +32,145 @@ cd ai-dashboard
 pnpm install
 ```
 
-### 2. Configure Environment
-
-Copy the example environment file and fill in your credentials:
+### 2. Configure environment
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` with your values:
+Edit `.env`:
 
 ```bash
-# Turso Database
-TURSO_DATABASE_URL=libsql://your-db.turso.io
-TURSO_AUTH_TOKEN=your-token-here
+# Required: secret token for API auth
+# Generate with: openssl rand -hex 32
+API_TOKEN=your-secret-token-here
 
-# Optional: embedded replica for faster local reads
-# TURSO_LOCAL_DB_PATH=/home/user/.ai-dashboard/local.db
-
-# OpenCode working directory
-OPENCODE_WORKING_DIR=/home/user/agent-workspaces
-
-# Local storage for diffs and session logs
-DIFF_STORAGE_DIR=/home/user/.ai-dashboard/diffs
-LOG_STORAGE_DIR=/home/user/.ai-dashboard/sessions
-
-# Auth — all API requests require: Authorization: Bearer <API_TOKEN>
-API_TOKEN=your-secure-token-here
-
-# Queue worker
-MAX_CONCURRENT_SESSIONS=3
-
-# Server
+# Optional
 PORT=3000
-NODE_ENV=development
-
-# Client (Vite exposes VITE_ prefixed vars to browser)
-VITE_API_TOKEN=your-secure-token-here
+MAX_CONCURRENT_SESSIONS=3
 ```
 
-### 3. Run Database Migrations
+### 3. Configure your AI provider
+
+On first run, `~/.ai-dashboard/models.json` is auto-created with defaults. Edit it to set your provider and API key:
+
+```json
+{
+  "provider": "anthropic",
+  "apiKey": "sk-ant-...",
+  "plannerModel": "claude-opus-4-5",
+  "coderModel": "claude-sonnet-4-5"
+}
+```
+
+### 4. Apply migrations
 
 ```bash
-pnpm db:generate
 pnpm db:migrate
 ```
 
-### 4. Development Mode
+Database is created at `~/.ai-dashboard/dashboard.db` (SQLite, local file).
 
-Start both server and client in parallel:
+**Important:** never run `pnpm db:generate` — see `AGENTS.md` for migration rules.
+
+### 5. Start development
 
 ```bash
 pnpm dev
 ```
 
-- Server runs on `http://localhost:3000`
-- Client dev server runs on `http://localhost:5173` (proxies API to server)
+- Client: http://localhost:5173
+- Server: http://localhost:3000
 
-### 5. Production Build
+## Planning Workflow
 
-```bash
-pnpm build
+The planning phase runs the `start-work` + `create-plans` skill stack inside your project repo. The AI generates:
+
+```
+your-repo/.planning/
+└── <task-slug>/
+    ├── BRIEF.md       ← project vision
+    ├── ROADMAP.md     ← phased plan
+    └── phases/
+        └── 01-*/
+            └── 01-01-PLAN.md   ← executable task prompt
 ```
 
-The server will serve the built React app from `packages/client/dist`.
+You can read BRIEF.md and ROADMAP.md directly in the dashboard on the task detail page. If the plan needs work, click **Iterate Plan**, provide feedback, and the AI re-runs planning with your notes.
 
-## Deployment with PM2
+When you're happy with the plan, click **Mark Ready to Code** — the queue worker picks it up and runs the coding session.
 
-### Install PM2
+## Personas
 
-```bash
-pnpm add -g pm2
+Personas define how the AI behaves. There are four types:
+
+| Type | Purpose | Default model | Bash tool |
+|------|---------|---------------|-----------|
+| `planner` | Generates BRIEF + PLAN docs | claude-opus-4-5 | No |
+| `coder` | Executes PLAN.md tasks | claude-sonnet-4-5 | Yes |
+| `reviewer` | Reviews diffs | claude-sonnet-4-5 | No |
+| `custom` | Any other use | configurable | configurable |
+
+Provider and model are configurable per persona — they are resolved against `~/.ai-dashboard/models.json` at session start.
+
+## Projects
+
+Projects register local repos by name and filesystem path. Paths support `~` (expanded at runtime). The path is validated against the filesystem when you save.
+
+Once a project is registered, it appears in the task creation form as a dropdown — no more error-prone free-text repo paths.
+
+## Task State Machine
+
+```
+DRAFT → IN_PLANNING → PLANNED → READY_TO_CODE → QUEUED → RUNNING → AWAITING_REVIEW → APPROVED → COMPLETE
+                                                                                      ↘ REJECTED
+                                                         (on error at any stage) → FAILED
 ```
 
-### Start the Server
+Manual transitions available from the dashboard:
+- **DRAFT → IN_PLANNING**: "Start Planning" button (requires Planning Persona)
+- **PLANNED → IN_PLANNING**: "Iterate Plan" (provide feedback, re-trigger AI)
+- **PLANNED → READY_TO_CODE**: "Mark Ready to Code"
+- **AWAITING_REVIEW → APPROVED/REJECTED**: review buttons on task detail
 
-```bash
-pm2 start packages/server/dist/index.js --name "ai-dashboard"
-pm2 save
-pm2 startup  # auto-start on system boot
-```
+## API Reference
 
-### Update Deployment
+All endpoints require `Authorization: Bearer <API_TOKEN>` except `GET /api/models`.
 
-```bash
-git pull origin main
-pnpm install
-pnpm build
-pm2 restart ai-dashboard
-```
+### Projects
 
-## Cloudflare Tunnel Setup
-
-To expose your homelab dashboard securely:
-
-1. Install cloudflared:
-
-```bash
-# Download from https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/
-```
-
-2. Create a tunnel:
-
-```bash
-cloudflared tunnel create ai-dashboard
-```
-
-3. Configure `~/.cloudflared/config.yml`:
-
-```yaml
-tunnel: ai-dashboard
-credentials-file: /home/user/.cloudflared/<tunnel-id>.json
-
-ingress:
-  - hostname: dashboard.yourdomain.com
-    service: http://localhost:3000
-  - service: http_status:404
-```
-
-4. Run the tunnel:
-
-```bash
-cloudflared tunnel run ai-dashboard
-```
-
-5. Create DNS record:
-
-```bash
-cloudflared tunnel route dns ai-dashboard dashboard.yourdomain.com
-```
-
-## API Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/projects` | List projects (`?activeOnly=true`) |
+| POST | `/api/projects` | Create project |
+| GET | `/api/projects/:id` | Get project |
+| PATCH | `/api/projects/:id` | Update project |
+| DELETE | `/api/projects/:id` | Delete project |
+| GET | `/api/projects/validate-path` | Validate path (`?path=~/my-repo`) |
 
 ### Personas
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/personas` | List all personas |
+| GET | `/api/personas` | List personas |
 | POST | `/api/personas` | Create persona |
-| GET | `/api/personas/:id` | Get single persona |
+| GET | `/api/personas/:id` | Get persona |
 | PUT | `/api/personas/:id` | Update persona |
-| PATCH | `/api/personas/:id/toggle` | Toggle active status |
-| DELETE | `/api/personas/:id` | Soft delete persona |
+| PATCH | `/api/personas/:id/toggle` | Toggle active |
+| DELETE | `/api/personas/:id` | Soft delete |
+| GET | `/api/models` | Available providers + models (public) |
 
 ### Tasks
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/tasks` | List tasks (supports filters) |
+| GET | `/api/tasks` | List tasks (`?status=`, `?personaId=`) |
 | POST | `/api/tasks` | Create task |
-| GET | `/api/tasks/:id` | Get single task |
-| PATCH | `/api/tasks/:id/status` | Update task status |
+| GET | `/api/tasks/:id` | Get task |
+| PATCH | `/api/tasks/:id/status` | Update status manually |
+| POST | `/api/tasks/:id/start-planning` | Trigger planning (DRAFT → IN_PLANNING) |
+| POST | `/api/tasks/:id/iterate-plan` | Re-plan with feedback (PLANNED → IN_PLANNING) |
+| GET | `/api/tasks/:id/plan-doc` | Read plan doc (`?file=BRIEF.md`) |
 | GET | `/api/tasks/:id/diff` | Get diff file |
 
 ### Events
@@ -201,30 +178,41 @@ cloudflared tunnel route dns ai-dashboard dashboard.yourdomain.com
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/tasks/:taskId/events` | List task events |
+| WS | `/ws/tasks/:taskId/stream` | Real-time event stream |
 
-### WebSocket
+## Deployment (PM2)
 
-| Endpoint | Description |
-|----------|-------------|
-| `/ws/tasks/:taskId/stream` | Real-time task event stream |
+```bash
+pnpm build
+pm2 start packages/server/dist/index.js --name "ai-dashboard"
+pm2 save
+pm2 startup  # auto-start on system boot
+```
 
-All API requests require `Authorization: Bearer <API_TOKEN>` header.
+To update:
+
+```bash
+git pull origin main
+pnpm install
+pnpm db:migrate
+pnpm build
+pm2 restart ai-dashboard
+```
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Runtime | Node.js (LTS) |
+| Runtime | Node.js v22 |
 | Package manager | pnpm |
-| Backend framework | Hono |
-| Database | Turso Cloud (libSQL) |
-| ORM / migrations | Drizzle |
+| Backend | Hono + `@hono/node-server` |
+| Database | SQLite (`better-sqlite3`) + Drizzle ORM |
 | Frontend | React 18 + TypeScript + Vite |
 | Styling | Tailwind CSS v3 |
 | Data fetching | TanStack Query v5 |
 | Forms | React Hook Form + Zod |
 | Routing | React Router v6 |
-| AI agent execution | OpenCode SDK |
+| AI execution | OpenCode SDK (`@opencode-ai/sdk`) |
 
 ## License
 
