@@ -11,7 +11,7 @@ A self-hosted AI Agent Dashboard with a Hono backend and React frontend. Users d
 | Runtime | Node.js (LTS) |
 | Package Manager | pnpm |
 | Backend | Hono + `@hono/node-server` |
-| Database | Turso Cloud (libSQL) + Drizzle ORM |
+| Database | SQLite (local, `better-sqlite3`) + Drizzle ORM |
 | Frontend | React 18 + TypeScript + Vite |
 | Styling | Tailwind CSS v3 |
 | Data Fetching | TanStack Query v5 |
@@ -62,7 +62,22 @@ Configured in both `tsconfig.json` files and `vite.config.ts`.
 
 - Use Drizzle ORM for all database operations
 - Schema defined in `packages/server/src/db/schema.ts`
-- Run migrations with `pnpm db:generate` then `pnpm db:migrate`
+- DB file lives at `~/.ai-dashboard/dashboard.db` (auto-created on first run)
+
+#### Migration rules — CRITICAL
+
+**Never wipe the DB to apply schema changes.** Always use additive migrations:
+
+1. Edit `schema.ts` with the new column/table
+2. **Do NOT run `pnpm db:generate`** — it prompts interactively in non-TTY environments and cannot be answered via stdin
+3. Instead, manually create the next numbered migration file, e.g. `packages/server/src/db/migrations/0002_my_change.sql`:
+   - For new columns: `ALTER TABLE \`table\` ADD \`column\` type DEFAULT value;`
+   - For new tables: full `CREATE TABLE` statement
+4. Register it in `packages/server/src/db/migrations/meta/_journal.json` (increment `idx`, new `tag`)
+5. Update `packages/server/src/db/migrations/meta/0000_snapshot.json` to reflect the cumulative schema state
+6. Run `pnpm db:migrate` — applies only the new migration, existing data is preserved
+
+**Never do `rm ~/.ai-dashboard/dashboard.db`** unless explicitly told to reset all data.
 
 ### Environment Variables
 
@@ -93,8 +108,7 @@ Configured in both `tsconfig.json` files and `vite.config.ts`.
 # Install dependencies
 pnpm install
 
-# Generate migrations (after schema changes)
-pnpm db:generate
+# Apply migrations (see migration rules above — do NOT use db:generate)
 pnpm db:migrate
 
 # Development
