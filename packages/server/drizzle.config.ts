@@ -1,15 +1,19 @@
 import { defineConfig } from "drizzle-kit"
 import { config } from "dotenv"
 import path from "path"
+import os from "os"
 
 config({ path: path.resolve(__dirname, "../../.env") })
+
+const dbPath = process.env.SQLITE_DB_PATH
+  ? path.resolve(process.env.SQLITE_DB_PATH.replace(/^~/, os.homedir()))
+  : path.join(os.homedir(), ".ai-dashboard", "dashboard.db")
 
 export default defineConfig({
   schema: "./src/db/schema.ts",
   out: "./src/db/migrations",
-  dialect: "turso",
+  dialect: "sqlite",
   dbCredentials: {
-    url: process.env.TURSO_DATABASE_URL!,
-    authToken: process.env.TURSO_AUTH_TOKEN,
+    url: dbPath,
   },
 })

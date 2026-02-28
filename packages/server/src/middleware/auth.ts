@@ -1,8 +1,8 @@
 import { Context, Next } from "hono"
 
-const validToken = process.env.API_TOKEN
-
 export async function authMiddleware(c: Context, next: Next) {
+  const validToken = process.env.API_TOKEN
+  
   if (c.req.path === "/api/health") {
     return next()
   }
