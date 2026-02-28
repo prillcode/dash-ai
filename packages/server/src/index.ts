@@ -10,6 +10,7 @@ import { join } from "path"
 import { personasRouter } from "./routes/personas"
 import { tasksRouter } from "./routes/tasks"
 import { eventsRouter } from "./routes/events"
+import { modelsRouter } from "./routes/models"
 import { authMiddleware } from "./middleware/auth"
 import { loggerMiddleware } from "./middleware/logger"
 import { startQueueWorker } from "./services/queueWorker"
@@ -24,6 +25,7 @@ app.use("*", logger())
 app.use("*", loggerMiddleware)
 
 app.get("/api/health", (c) => c.json({ status: "ok" }))
+app.route("/api/models", modelsRouter)
 
 app.use("/api/*", authMiddleware)
 

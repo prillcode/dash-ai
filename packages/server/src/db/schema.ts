@@ -1,11 +1,22 @@
 import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core"
 
+export const PersonaType = {
+  PLANNER: "planner",
+  CODER: "coder",
+  REVIEWER: "reviewer",
+  CUSTOM: "custom",
+} as const
+
+export type PersonaTypeValue = typeof PersonaType[keyof typeof PersonaType]
+
 export const personas = sqliteTable("personas", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
+  personaType: text("persona_type").notNull().default("custom"),
   systemPrompt: text("system_prompt").notNull(),
   model: text("model").notNull().default("claude-sonnet-4-5"),
+  provider: text("provider").notNull().default("anthropic"),
   allowedTools: text("allowed_tools").notNull().default("[]"),
   contextFiles: text("context_files").notNull().default("[]"),
   tags: text("tags").notNull().default("[]"),

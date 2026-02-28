@@ -72,3 +72,12 @@ export function useDeletePersona() {
     },
   })
 }
+
+export function useModels() {
+  return useQuery({
+    queryKey: ["models"],
+    queryFn: () =>
+      apiClient<{ providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; note?: string }> }> }>("/api/models"),
+    staleTime: Infinity,
+  })
+}

@@ -9,8 +9,43 @@ const dbPath = process.env.SQLITE_DB_PATH
   : path.join(os.homedir(), ".ai-dashboard", "dashboard.db")
 
 // Ensure the directory exists before opening the database
-import { mkdirSync } from "fs"
+import { mkdirSync, existsSync, writeFileSync } from "fs"
 mkdirSync(path.dirname(dbPath), { recursive: true })
+
+// Write default models.json if it doesn't exist
+const modelsJsonPath = path.join(os.homedir(), ".ai-dashboard", "models.json")
+if (!existsSync(modelsJsonPath)) {
+  const defaultModels = {
+    providers: [
+      {
+        id: "anthropic",
+        name: "Anthropic",
+        models: [
+          { id: "claude-opus-4-5", name: "Claude Opus 4.5", note: "best for planning" },
+          { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", note: "best for coding" },
+          { id: "claude-haiku-3-5", name: "Claude Haiku 3.5", note: "fast + cheap" },
+        ],
+      },
+      {
+        id: "openai",
+        name: "OpenAI",
+        models: [
+          { id: "o3", name: "o3", note: "best for planning" },
+          { id: "gpt-4o", name: "GPT-4o", note: "fast + capable" },
+        ],
+      },
+      {
+        id: "ollama",
+        name: "Ollama (local)",
+        models: [
+          { id: "qwen2.5-coder:32b", name: "Qwen 2.5 Coder 32B", note: "strong local coding model" },
+          { id: "llama3.3:70b", name: "Llama 3.3 70B", note: "strong local general model" },
+        ],
+      },
+    ],
+  }
+  writeFileSync(modelsJsonPath, JSON.stringify(defaultModels, null, 2))
+}
 
 const sqlite = new Database(dbPath)
 

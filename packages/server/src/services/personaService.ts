@@ -11,8 +11,10 @@ export interface ParsedPersona {
   id: string
   name: string
   description: string
+  personaType: string
   systemPrompt: string
   model: string
+  provider: string
   allowedTools: string[]
   contextFiles: string[]
   tags: string[]
@@ -24,8 +26,10 @@ export interface ParsedPersona {
 export interface PersonaInput {
   name: string
   description?: string
+  personaType?: string
   systemPrompt: string
   model?: string
+  provider?: string
   allowedTools?: string[]
   contextFiles?: string[]
   tags?: string[]
@@ -72,8 +76,10 @@ export async function createPersona(input: PersonaInput): Promise<ParsedPersona>
     id,
     name: input.name,
     description: input.description || "",
+    personaType: input.personaType || "custom",
     systemPrompt: input.systemPrompt,
     model: input.model || "claude-sonnet-4-5",
+    provider: input.provider || "anthropic",
     allowedTools: serialized.allowedTools,
     contextFiles: serialized.contextFiles,
     tags: serialized.tags,
