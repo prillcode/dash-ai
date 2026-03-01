@@ -26,24 +26,6 @@ export function TaskActionBar({ task }: TaskActionBarProps) {
     }
   }
 
-  const handleApprovePlan = () => {
-    if (window.confirm("Approve plan and queue for coding?")) {
-      updateStatus.mutate({
-        id: task.id,
-        status: TaskStatus.READY_TO_CODE,
-      })
-    }
-  }
-
-  const handleRejectPlan = () => {
-    const note = prompt("Rejection reason (optional):")
-    updateStatus.mutate({
-      id: task.id,
-      status: TaskStatus.DRAFT,
-      reviewNote: note || undefined,
-    })
-  }
-
   const handleApprove = () => {
     updateStatus.mutate({
       id: task.id,
@@ -107,26 +89,9 @@ export function TaskActionBar({ task }: TaskActionBarProps) {
     }
   }
 
-  // PLANNED tasks
+  // PLANNED tasks — actions are in PlanningSection (Mark Ready to Code / Iterate Plan)
   if (task.status === TaskStatus.PLANNED) {
-    return (
-      <div className="flex items-center gap-2">
-        <Button
-          variant="success"
-          onClick={handleApprovePlan}
-          disabled={updateStatus.isPending}
-        >
-          Approve Plan
-        </Button>
-        <Button
-          variant="destructive"
-          onClick={handleRejectPlan}
-          disabled={updateStatus.isPending}
-        >
-          Reject Plan
-        </Button>
-      </div>
-    )
+    return null
   }
 
   // READY_TO_CODE tasks (optional manual queue)

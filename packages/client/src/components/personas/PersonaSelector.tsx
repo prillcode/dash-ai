@@ -6,6 +6,7 @@ interface PersonaSelectorProps {
   onChange: (personaId: string, personaName: string) => void
   placeholder?: string
   className?: string
+  filterType?: string
 }
 
 export function PersonaSelector({
@@ -13,8 +14,17 @@ export function PersonaSelector({
   onChange,
   placeholder = "Select a persona",
   className = "",
+  filterType,
 }: PersonaSelectorProps) {
-  const { data: personas, isLoading } = usePersonas(true)
+  const { data: allPersonas, isLoading } = usePersonas(true)
+
+  const personas = filterType
+    ? allPersonas?.filter((p: Persona) =>
+        filterType === "coder"
+          ? p.personaType === "coder" || p.personaType === "custom"
+          : p.personaType === filterType
+      )
+    : allPersonas
 
   if (isLoading) {
     return (

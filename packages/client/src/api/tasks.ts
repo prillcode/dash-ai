@@ -81,6 +81,53 @@ export function useUpdateTaskStatus() {
   })
 }
 
+export function useIteratePlan() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ taskId, feedback }: { taskId: string; feedback: string }) =>
+      apiClient<Task>(`/api/tasks/${taskId}/iterate-plan`, {
+        method: "POST",
+        body: JSON.stringify({ feedback }),
+      }),
+    onSuccess: (task) => {
+      queryClient.invalidateQueries({ queryKey: ["task", task.id] })
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+    },
+  })
+}
+
+export function usePlanDoc(
+  taskId: string,
+  file: "BRIEF.md" | "ROADMAP.md" | "ISSUES.md",
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: ["plan-doc", taskId, file],
+    queryFn: () =>
+      apiClient<{ file: string; content: string }>(
+        `/api/tasks/${taskId}/plan-doc?file=${encodeURIComponent(file)}`
+      ),
+    enabled,
+    staleTime: 30_000,
+    retry: false,
+  })
+}
+
+export function useMarkReadyToCode() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (taskId: string) =>
+      apiClient<Task>(`/api/tasks/${taskId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "READY_TO_CODE" }),
+      }),
+    onSuccess: (task) => {
+      queryClient.invalidateQueries({ queryKey: ["task", task.id] })
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+    },
+  })
+}
+
 export function useTaskDiff(id: string, enabled = false) {
   return useQuery({
     queryKey: ["task-diff", id],
