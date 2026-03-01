@@ -11,9 +11,11 @@ import { personasRouter } from "./routes/personas"
 import { tasksRouter } from "./routes/tasks"
 import { eventsRouter } from "./routes/events"
 import { modelsRouter } from "./routes/models"
+import { projectsRouter } from "./routes/projects"
 import { authMiddleware } from "./middleware/auth"
 import { loggerMiddleware } from "./middleware/logger"
 import { startQueueWorker } from "./services/queueWorker"
+import { checkSkillsInstalled } from "./opencode/planningRunner"
 import { subscribe, unsubscribe } from "./ws/taskStream"
 
 const app = new Hono()
@@ -32,6 +34,7 @@ app.use("/api/*", authMiddleware)
 app.route("/api/personas", personasRouter)
 app.route("/api/tasks", tasksRouter)
 app.route("/api/tasks/:taskId/events", eventsRouter)
+app.route("/api/projects", projectsRouter)
 
 app.use("/*", serveStatic({ root: clientDistPath }))
 
@@ -64,6 +67,13 @@ server.on("upgrade", (request, socket, head) => {
 })
 
 console.log(`AI Dashboard server running on http://localhost:${port}`)
+
+const skillCheck = checkSkillsInstalled()
+if (!skillCheck.ok) {
+  console.warn(`⚠️  Warning: Missing planning skills: ${skillCheck.missing.join(", ")}`)
+  console.warn("    Planning tasks will fail until skills are installed at ~/.agents/skills/")
+  console.warn("    Install with: npx @prillcode/start-work")
+}
 
 startQueueWorker().catch((err) => {
   console.error("Queue worker failed to start:", err)

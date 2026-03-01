@@ -7,6 +7,8 @@ import {
   TaskCreatePage,
   PersonaListPage,
   PersonaFormPage,
+  ProjectListPage,
+  ProjectFormPage,
 } from "./pages"
 
 const queryClient = new QueryClient({
@@ -30,6 +32,9 @@ export function App() {
             <Route path="/personas" element={<PersonaListPage />} />
             <Route path="/personas/new" element={<PersonaFormPage />} />
             <Route path="/personas/:id/edit" element={<PersonaFormPage />} />
+            <Route path="/projects" element={<ProjectListPage />} />
+            <Route path="/projects/new" element={<ProjectFormPage />} />
+            <Route path="/projects/:id/edit" element={<ProjectFormPage />} />
           </Routes>
         </AppLayout>
       </BrowserRouter>

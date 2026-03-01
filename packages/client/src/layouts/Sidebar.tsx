@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom"
 const navItems = [
   { path: "/tasks", label: "Task Queue", icon: "📋" },
   { path: "/personas", label: "Personas", icon: "👤" },
+  { path: "/projects", label: "Projects", icon: "📁" },
 ]
 
 export function Sidebar() {

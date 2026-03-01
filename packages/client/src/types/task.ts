@@ -24,6 +24,7 @@ export interface Task {
   planningPersonaName: string | null
   status: TaskStatusType
   priority: number
+  projectId: string
   repoPath: string
   targetFiles: string[]
   planFeedback: string | null
@@ -45,7 +46,7 @@ export interface TaskInput {
   description: string
   codingPersonaId: string
   planningPersonaId?: string
-  repoPath: string
+  projectId: string
   targetFiles?: string[]
   priority?: number
 }

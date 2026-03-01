@@ -1,8 +1,12 @@
-import { eq, desc, asc, and, inArray } from "drizzle-orm"
+import { eq, desc, asc, and, inArray, isNull } from "drizzle-orm"
 import { db } from "../db/client"
+import * as projectService from "./projectService"
 import { tasks, TaskStatus } from "../db/schema"
 import { generateId } from "../utils/id"
 import { now } from "../utils/time"
+import { readFile } from "fs/promises"
+import { existsSync } from "fs"
+import { join } from "path"
 
 type Task = typeof tasks.$inferSelect
 type NewTask = typeof tasks.$inferInsert
@@ -14,7 +18,7 @@ export interface TaskInput {
   codingPersonaName: string
   planningPersonaId?: string
   planningPersonaName?: string
-  repoPath: string
+  projectId: string
   targetFiles?: string[]
   priority?: number
 }
@@ -70,6 +74,10 @@ export async function getTask(id: string): Promise<Task | null> {
 }
 
 export async function createTask(input: TaskInput): Promise<Task> {
+  const project = await projectService.getProject(input.projectId)
+  if (!project) {
+    throw new Error(`Project ${input.projectId} not found`)
+  }
   const id = generateId()
   const timestamp = now()
   const serialized = serializeTask(input)
@@ -84,7 +92,8 @@ export async function createTask(input: TaskInput): Promise<Task> {
     planningPersonaName: input.planningPersonaName ?? null,
     status: TaskStatus.DRAFT,
     priority: input.priority ?? 3,
-    repoPath: input.repoPath,
+    projectId: input.projectId,
+    repoPath: project.resolvedPath,
     targetFiles: serialized.targetFiles,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -117,6 +126,25 @@ export async function claimNextReadyTask(): Promise<Task | null> {
       .select({ id: tasks.id })
       .from(tasks)
       .where(eq(tasks.status, TaskStatus.READY_TO_CODE))
+      .orderBy(asc(tasks.priority), asc(tasks.createdAt))
+      .limit(1)
+    ))
+    .returning()
+  
+  return row ? parseTask(row) : null
+}
+
+export async function claimNextPlanningTask(): Promise<Task | null> {
+  const sessionId = `planning-${generateId()}`
+  const [row] = await db.update(tasks)
+    .set({ sessionId, updatedAt: now() })
+    .where(eq(tasks.id, db
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(and(
+        eq(tasks.status, TaskStatus.IN_PLANNING),
+        isNull(tasks.sessionId)
+      ))
       .orderBy(asc(tasks.priority), asc(tasks.createdAt))
       .limit(1)
     ))
@@ -158,4 +186,20 @@ export async function updateTaskDiffPath(id: string, diffPath: string): Promise<
     .returning()
   
   return row ? parseTask(row) : null
+}
+
+export async function readPlanDoc(
+  repoPath: string,
+  planPath: string,
+  file: string
+): Promise<string | null> {
+  // repoPath is already resolved (no ~) — stored as resolvedPath from project
+  // planPath is the subfolder under .planning/ (e.g. "pcw-101-my-task")
+  const fullPath = join(repoPath, ".planning", planPath, file)
+  if (!existsSync(fullPath)) return null
+  try {
+    return await readFile(fullPath, "utf-8")
+  } catch {
+    return null
+  }
 }

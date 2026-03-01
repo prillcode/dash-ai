@@ -28,8 +28,23 @@ export const personas = sqliteTable("personas", {
   createdAtIdx: index("idx_personas_created_at").on(table.createdAt),
 }))
 
+export const projects = sqliteTable("projects", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  path: text("path").notNull(),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (table) => ({
+  isActiveIdx: index("idx_projects_is_active").on(table.isActive),
+  createdAtIdx: index("idx_projects_created_at").on(table.createdAt),
+}))
+
+
 export const tasks = sqliteTable("tasks", {
   id: text("id").primaryKey(),
+  identifier: text("identifier"),
   title: text("title").notNull(),
   description: text("description").notNull(),
   codingPersonaId: text("coding_persona_id").notNull().references(() => personas.id),
@@ -39,6 +54,7 @@ export const tasks = sqliteTable("tasks", {
   status: text("status").notNull().default("DRAFT"),
   priority: integer("priority").notNull().default(3),
   repoPath: text("repo_path").notNull(),
+  projectId: text("project_id").references(() => projects.id),
   targetFiles: text("target_files").notNull().default("[]"),
   planFeedback: text("plan_feedback"),
   planPath: text("plan_path"),
