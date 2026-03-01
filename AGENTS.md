@@ -1,8 +1,8 @@
-# AI Dashboard — Developer Guide
+# Dash AI — Developer Guide
 
 ## Project Overview
 
-A self-hosted AI Agent Dashboard with a Hono backend and React frontend. Users define AI agent personas, submit coding tasks to a queue, and monitor execution in real-time via OpenCode SDK integration.
+Dash AI is a self-hosted AI agent dashboard with a Hono backend and React frontend. Users define AI agent personas, submit coding tasks to a queue, and monitor execution in real-time via OpenCode SDK integration.
 
 ### Tech Stack
 
@@ -22,7 +22,7 @@ A self-hosted AI Agent Dashboard with a Hono backend and React frontend. Users d
 ### Project Structure
 
 ```
-ai-dashboard/
+dash-ai/
 ├── packages/
 │   ├── server/           # Hono backend
 │   │   └── src/
@@ -62,7 +62,7 @@ Configured in both `tsconfig.json` files and `vite.config.ts`.
 
 - Use Drizzle ORM for all database operations
 - Schema defined in `packages/server/src/db/schema.ts`
-- DB file lives at `~/.ai-dashboard/dashboard.db` (auto-created on first run)
+- DB file lives at `~/.dash-ai/dashboard.db` (auto-created on first run)
 
 #### Migration rules — CRITICAL
 
@@ -77,7 +77,7 @@ Configured in both `tsconfig.json` files and `vite.config.ts`.
 5. Update `packages/server/src/db/migrations/meta/0000_snapshot.json` to reflect the cumulative schema state
 6. Run `pnpm db:migrate` — applies only the new migration, existing data is preserved
 
-**Never do `rm ~/.ai-dashboard/dashboard.db`** unless explicitly told to reset all data.
+**Never do `rm ~/.dash-ai/dashboard.db`** unless explicitly told to reset all data.
 
 ### Environment Variables
 

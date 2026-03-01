@@ -30,7 +30,7 @@ Thumbs.db
 *.db
 *.db-journal
 
-# AI Dashboard specific
+# Dash AI specific
 packages/server/src/db/migrations/
 packages/client/dist/
 .turbo/

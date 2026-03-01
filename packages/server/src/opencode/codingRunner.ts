@@ -53,8 +53,8 @@ export async function runCodingSession(
   onEvent: (type: string, payload: Record<string, unknown>) => Promise<void>
 ): Promise<CodingResult> {
   const home = homedir()
-  const sessionDir = join(home, ".ai-dashboard", "sessions", input.taskId)
-  const diffDir = join(home, ".ai-dashboard", "diffs", input.taskId)
+  const sessionDir = join(home, ".dash-ai", "sessions", input.taskId)
+  const diffDir = join(home, ".dash-ai", "diffs", input.taskId)
   const logPath = join(sessionDir, "session.log")
   const diffPath = join(diffDir, "changes.diff")
 
@@ -80,15 +80,7 @@ export async function runCodingSession(
           const { stdout } = await execAsync("git diff HEAD", { cwd: input.repoPath })
           await writeFile(diffPath, stdout)
         } catch (gitError) {}
-        // Simulate auth error detection (placeholder)
-        if (detectAuthError("OpenCode SDK not found — install @opencode-ai/sdk")) {
-          return {
-            success: false,
-            sessionId: "",
-            errorMessage: "Authentication failed — check your API key (ANTHROPIC_API_KEY, DEEPSEEK_API_KEY, etc.) or provider credentials. " +
-                          "Edit ~/.ai-dashboard/models.json to update your API key."
-          }
-        }
+
         return {
           success: false,
           sessionId: `coding-${input.taskId}-${Date.now()}`,
@@ -204,8 +196,8 @@ export async function runCodingSession(
       return {
         success: false,
         sessionId: "",
-        errorMessage: "Authentication failed — check your API key (ANTHROPIC_API_KEY, DEEPSEEK_API_KEY, etc.) or provider credentials. " +
-                      "Edit ~/.ai-dashboard/models.json to update your API key."
+        errorMessage: "Authentication failed. OpenCode SDK reads credentials from ~/.local/share/opencode/auth.json.\n" +
+                      "Use '/connect' in OpenCode TUI/IDE to add providers, or set environment variables (ANTHROPIC_API_KEY, DEEPSEEK_API_KEY, etc.)."
       }
     }
 

@@ -52,7 +52,7 @@ const DEFAULT_MODELS = {
 }
 
 modelsRouter.get("/", (c) => {
-  const modelsPath = join(os.homedir(), ".ai-dashboard", "models.json")
+  const modelsPath = join(os.homedir(), ".dash-ai", "models.json")
   if (existsSync(modelsPath)) {
     try {
       const content = readFileSync(modelsPath, "utf-8")

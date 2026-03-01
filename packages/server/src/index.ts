@@ -43,7 +43,7 @@ app.notFound((c) => {
   if (existsSync(indexPath)) {
     return c.html(readFileSync(indexPath, "utf-8"))
   }
-  return c.html("<html><body><h1>AI Dashboard</h1><p>Frontend not built</p></body></html>")
+  return c.html("<html><body><h1>Dash AI</h1><p>Frontend not built</p></body></html>")
 })
 
 const server = serve({
@@ -66,7 +66,7 @@ server.on("upgrade", (request, socket, head) => {
   }
 })
 
-console.log(`AI Dashboard server running on http://localhost:${port}`)
+console.log(`Dash AI server running on http://localhost:${port}`)
 
 const skillCheck = checkSkillsInstalled()
 if (!skillCheck.ok) {

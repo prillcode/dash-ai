@@ -6,14 +6,14 @@ import os from "os"
 
 const dbPath = process.env.SQLITE_DB_PATH
   ? path.resolve(process.env.SQLITE_DB_PATH.replace(/^~/, os.homedir()))
-  : path.join(os.homedir(), ".ai-dashboard", "dashboard.db")
+  : path.join(os.homedir(), ".dash-ai", "dashboard.db")
 
 // Ensure the directory exists before opening the database
 import { mkdirSync, existsSync, writeFileSync } from "fs"
 mkdirSync(path.dirname(dbPath), { recursive: true })
 
 // Write default models.json if it doesn't exist
-const modelsJsonPath = path.join(os.homedir(), ".ai-dashboard", "models.json")
+const modelsJsonPath = path.join(os.homedir(), ".dash-ai", "models.json")
 if (!existsSync(modelsJsonPath)) {
   const defaultModels = {
     providers: [

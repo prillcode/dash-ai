@@ -1,4 +1,4 @@
-# AI Dashboard — Task Flow Chart
+# Dash AI — Task Flow Chart
 
 End-to-end flow of a coding task from creation to completion.
 
@@ -103,7 +103,7 @@ End-to-end flow of a coding task from creation to completion.
 │     → executes first unexecuted PLAN.md (no SUMMARY.md yet)    │
 │  4. Stream events → eventService                                │
 │  5. On completion: git diff HEAD → changes.diff                 │
-│  6. Write log → ~/.ai-dashboard/sessions/<taskId>/session.log   │
+│  6. Write log → ~/.dash-ai/sessions/<taskId>/session.log   │
 └─────────────────────────────────────────────────────────────────┘
          │                          │
          │                          │  WebSocket broadcast
@@ -119,8 +119,8 @@ End-to-end flow of a coding task from creation to completion.
          ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Status: AWAITING_REVIEW                                        │
-│  - diff saved to ~/.ai-dashboard/diffs/<taskId>/changes.diff    │
-│  - log saved to ~/.ai-dashboard/sessions/<taskId>/session.log   │
+│  - diff saved to ~/.dash-ai/diffs/<taskId>/changes.diff    │
+│  - log saved to ~/.dash-ai/sessions/<taskId>/session.log   │
 └─────────────────────────────────────────────────────────────────┘
          │
          │  Human reviews diff in DiffReviewPanel
@@ -171,8 +171,8 @@ RUNNING / IN_PLANNING ──► (error thrown in runner)
 │  Status: FAILED                                                 │
 │  - errorMessage stored on task                                  │
 │  - Auth errors surface a clear message:                         │
-│    "Authentication failed — check ANTHROPIC_API_KEY or          │
-│     edit ~/.ai-dashboard/models.json"                           │
+│    "Authentication failed — use '/connect' in OpenCode or       │
+│     set environment variables (ANTHROPIC_API_KEY, etc.)"        │
 │  - Task visible in queue with error details                     │
 └─────────────────────────────────────────────────────────────────┘
 ```

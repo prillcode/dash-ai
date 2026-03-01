@@ -1,4 +1,4 @@
-# AI Dashboard
+# Dash AI
 
 A self-hosted, planning-first AI kanban board for managing coding tasks across local repos. Submit a task, let an AI planner generate a spec, review and iterate on it, then approve it for coding — all from the dashboard.
 
@@ -28,7 +28,7 @@ A self-hosted, planning-first AI kanban board for managing coding tasks across l
 
 ```bash
 git clone <repository-url>
-cd ai-dashboard
+cd dash-ai
 pnpm install
 ```
 
@@ -52,7 +52,7 @@ MAX_CONCURRENT_SESSIONS=3
 
 ### 3. Configure your AI provider
 
-On first run, `~/.ai-dashboard/models.json` is auto-created with defaults. Edit it to set your provider and API key:
+On first run, `~/.dash-ai/models.json` is auto-created with defaults. Edit it to configure available models. API keys are managed via OpenCode `/connect` command or environment variables.
 
 ```json
 {
@@ -69,7 +69,12 @@ On first run, `~/.ai-dashboard/models.json` is auto-created with defaults. Edit 
 pnpm db:migrate
 ```
 
-Database is created at `~/.ai-dashboard/dashboard.db` (SQLite, local file).
+Database is created at `~/.dash-ai/dashboard.db` (SQLite, local file).
+
+**Upgrading from v0.5.x?** If you have an existing `~/.ai-dashboard/` directory, move it:
+```bash
+mv ~/.ai-dashboard ~/.dash-ai
+```
 
 **Important:** never run `pnpm db:generate` — see `AGENTS.md` for migration rules.
 
@@ -111,7 +116,7 @@ Personas define how the AI behaves. There are four types:
 | `reviewer` | Reviews diffs | claude-sonnet-4-5 | No |
 | `custom` | Any other use | configurable | configurable |
 
-Provider and model are configurable per persona — they are resolved against `~/.ai-dashboard/models.json` at session start.
+Provider and model are configurable per persona — they are selected from `~/.dash-ai/models.json` at session start.
 
 ## Projects
 
@@ -184,7 +189,7 @@ All endpoints require `Authorization: Bearer <API_TOKEN>` except `GET /api/model
 
 ```bash
 pnpm build
-pm2 start packages/server/dist/index.js --name "ai-dashboard"
+pm2 start packages/server/dist/index.js --name "dash-ai"
 pm2 save
 pm2 startup  # auto-start on system boot
 ```
@@ -196,7 +201,7 @@ git pull origin main
 pnpm install
 pnpm db:migrate
 pnpm build
-pm2 restart ai-dashboard
+pm2 restart dash-ai
 ```
 
 ## Tech Stack

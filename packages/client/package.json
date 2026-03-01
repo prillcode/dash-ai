@@ -1,6 +1,6 @@
 {
-  "name": "@ai-dashboard/client",
-  "version": "0.5.1",
+  "name": "@dash-ai/client",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "scripts": {

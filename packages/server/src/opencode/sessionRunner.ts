@@ -42,8 +42,8 @@ export class SessionRunner {
     this.task = task
     this.persona = persona
     this.workingDir = process.env.OPENCODE_WORKING_DIR || "/tmp/opencode-workspaces"
-    this.diffDir = process.env.DIFF_STORAGE_DIR || "/tmp/ai-dashboard/diffs"
-    this.logDir = process.env.LOG_STORAGE_DIR || "/tmp/ai-dashboard/sessions"
+    this.diffDir = process.env.DIFF_STORAGE_DIR || "/tmp/dash-ai/diffs"
+    this.logDir = process.env.LOG_STORAGE_DIR || "/tmp/dash-ai/sessions"
   }
 
   async run(): Promise<SessionResult> {
