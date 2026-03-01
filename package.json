@@ -1,5 +1,6 @@
 {
   "name": "ai-dashboard",
+  "version": "0.5.1",
   "private": true,
   "scripts": {
     "dev": "pnpm --parallel -r dev",
