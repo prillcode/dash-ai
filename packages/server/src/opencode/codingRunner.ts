@@ -1,12 +1,8 @@
 import { homedir } from "os"
 import { join } from "path"
-import { promisify } from "util"
-import { exec } from "child_process"
-import { mkdir, writeFile } from "fs/promises"
+import { mkdir, appendFile } from "fs/promises"
 import type { Config } from "@opencode-ai/sdk"
 import { normalizeModel } from "./planningRunner"
-
-const execAsync = promisify(exec)
 
 export interface CodingRunnerInput {
   taskId: string
@@ -48,6 +44,16 @@ function detectAuthError(errorText: string): boolean {
   return patterns.some(pattern => pattern.test(errorText))
 }
 
+async function logEvent(
+  logPath: string,
+  type: string,
+  data: Record<string, unknown>
+): Promise<void> {
+  const timestamp = new Date().toISOString()
+  const logLine = `[${timestamp}] [${type}] ${JSON.stringify(data)}\n`
+  await appendFile(logPath, logLine)
+}
+
 export async function runCodingSession(
   input: CodingRunnerInput,
   onEvent: (type: string, payload: Record<string, unknown>) => Promise<void>
@@ -73,14 +79,8 @@ export async function runCodingSession(
           message: "OpenCode SDK not found — install @opencode-ai/sdk",
           stack: "Coding session runner is a placeholder. To enable real coding, install the OpenCode SDK."
         })
-        // Write placeholder log and diff as before
         const logContent = `[${new Date().toISOString()}] Coding session placeholder for task ${input.taskId}\n`
-        await writeFile(logPath, logContent)
-        try {
-          const { stdout } = await execAsync("git diff HEAD", { cwd: input.repoPath })
-          await writeFile(diffPath, stdout)
-        } catch (gitError) {}
-
+        await appendFile(logPath, logContent)
         return {
           success: false,
           sessionId: `coding-${input.taskId}-${Date.now()}`,
@@ -99,6 +99,7 @@ export async function runCodingSession(
       }
     })
 
+    await logEvent(logPath, "CODING_EVENT", { status: "creating_session", message: "Creating coding session" })
     await onEvent("CODING_EVENT", { status: "creating_session", message: "Creating coding session" })
 
     // Create a new session in the repository directory
@@ -112,12 +113,13 @@ export async function runCodingSession(
     }
 
     const sessionId = session.id
+    await logEvent(logPath, "CODING_EVENT", { status: "session_created", sessionId })
     await onEvent("CODING_EVENT", { status: "session_created", sessionId })
 
     // Normalize model to OpenCode format (provider/model-id)
     const normalizedModel = normalizeModel(input.codingPersona.model, input.codingPersona.provider)
 
-    // Send a prompt with the task description
+    await logEvent(logPath, "CODING_EVENT", { status: "sending_prompt", message: "Sending coding prompt" })
     await onEvent("CODING_EVENT", { status: "sending_prompt", message: "Sending coding prompt" })
     
     const promptResult = await client.session.prompt({
@@ -125,14 +127,14 @@ export async function runCodingSession(
       query: { directory: input.repoPath },
       body: {
          model: normalizedModel,
-        agent: "build",
-        system: input.codingPersona.systemPrompt,
-        tools: input.codingPersona.allowedTools.reduce((acc, tool) => ({ ...acc, [tool]: true }), {}),
-        parts: [
-          {
-            type: "text" as const,
-            text: input.taskDescription
-          }
+         agent: "build",
+         system: input.codingPersona.systemPrompt,
+         tools: input.codingPersona.allowedTools.reduce((acc, tool) => ({ ...acc, [tool]: true }), {}),
+         parts: [
+           {
+             type: "text" as const,
+             text: input.taskDescription
+           }
         ]
       }
     })
@@ -141,12 +143,51 @@ export async function runCodingSession(
       throw new Error("Prompt failed")
     }
 
+    await logEvent(logPath, "CODING_EVENT", { status: "prompt_sent", message: "Coding prompt sent" })
     await onEvent("CODING_EVENT", { status: "prompt_sent", message: "Coding prompt sent" })
 
-    // Wait for session to become idle (simple polling)
+    await logEvent(logPath, "CODING_EVENT", { status: "waiting", message: "Waiting for coding to complete" })
     await onEvent("CODING_EVENT", { status: "waiting", message: "Waiting for coding to complete" })
-    // TODO: Implement proper event streaming and completion detection
-    await new Promise(resolve => setTimeout(resolve, 10000))
+
+    // Poll session status until complete
+    let completed = false
+    let attempts = 0
+    const maxAttempts = 300  // 5 minutes max (300 * 1 second)
+    const pollInterval = 1000  // poll every second
+
+    while (!completed && attempts < maxAttempts) {
+      attempts++
+      
+      try {
+        const info = await client.session.info({
+          path: { id: sessionId }
+        })
+
+        if (info && info.status) {
+          const status = String(info.status).toLowerCase()
+          
+          if (status === "completed" || status === "idle" || status === "cancelled" || status === "error") {
+            completed = true
+            await logEvent(logPath, "CODING_EVENT", { status: "session_finished", sessionStatus: status, attempts })
+            await onEvent("CODING_EVENT", { status: "session_finished", sessionStatus: status, message: "Coding session finished" })
+          } else {
+            await logEvent(logPath, "CODING_EVENT", { status: "polling", sessionStatus: status, attempt: attempts })
+          }
+        }
+      } catch (pollError) {
+        // If polling fails, wait and retry
+        await new Promise(resolve => setTimeout(resolve, pollInterval))
+        continue
+      }
+
+      if (!completed) {
+        await new Promise(resolve => setTimeout(resolve, pollInterval))
+      }
+    }
+
+    if (!completed) {
+      throw new Error("Session did not complete within timeout period")
+    }
 
     // Get diff from session
     const diffResult = await client.session.diff({
@@ -159,22 +200,26 @@ export async function runCodingSession(
       const diffText = diffResult.diff.map((fileDiff: any) => 
         `--- ${fileDiff.file}\n+++ ${fileDiff.file}\n${fileDiff.before}\n${fileDiff.after}`
       ).join('\n')
-      await writeFile(diffPath, diffText)
+      await appendFile(logPath, `[${new Date().toISOString()}] DIFF: ${diffResult.diff.length} files changed\n`)
+      await appendFile(diffPath, diffText)
     } else {
-      // Fallback to git diff
+      // Fallback to git diff if SDK diff returns empty
       try {
+        const { exec } = require("child_process")
+        const { promisify } = require("util")
+        const execAsync = promisify(exec)
         const { stdout } = await execAsync("git diff HEAD", { cwd: input.repoPath })
-        await writeFile(diffPath, stdout)
-      } catch (gitError) {}
+        await appendFile(diffPath, stdout)
+        await appendFile(logPath, `[${new Date().toISOString()}] DIFF: Fallback to git diff\n`)
+      } catch (gitError) {
+        await appendFile(logPath, `[${new Date().toISOString()}] DIFF: Failed to capture diff\n`)
+      }
     }
 
-    // Write session log (simplified)
-    const logContent = `[${new Date().toISOString()}] Coding session ${sessionId} completed\n`
-    await writeFile(logPath, logContent)
-
-    // Stop the server
+    // Stop server
     server.close()
 
+    await logEvent(logPath, "CODING_EVENT", { status: "completed", message: "Coding session finished" })
     await onEvent("CODING_EVENT", { status: "completed", message: "Coding session finished" })
 
     return {
@@ -187,8 +232,11 @@ export async function runCodingSession(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
     
-    // Detect auth errors in caught error
     if (detectAuthError(errorMessage)) {
+      await logEvent(logPath, "ERROR", {
+        message: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      })
       await onEvent("ERROR", {
         message: errorMessage,
         stack: error instanceof Error ? error.stack : undefined
@@ -201,6 +249,10 @@ export async function runCodingSession(
       }
     }
 
+    await logEvent(logPath, "ERROR", {
+      message: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined
+    })
     await onEvent("ERROR", {
       message: errorMessage,
       stack: error instanceof Error ? error.stack : undefined
