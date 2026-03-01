@@ -26,9 +26,11 @@ interface Task {
 }
 
 interface SessionResult {
+  success: boolean
   diffPath: string
   logPath: string
   sessionId: string
+  errorMessage?: string
 }
 
 export class SessionRunner {
@@ -48,20 +50,23 @@ export class SessionRunner {
 
   async run(): Promise<SessionResult> {
     const taskId = this.task.id
-    const sessionId = `session-${taskId}-${Date.now()}`
-    const logEntries: string[] = []
 
     try {
       return await runSession(this.task, this.persona)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      logEntries.push(`[${now()}] ERROR: ${errorMessage}`)
-      
+
       await eventService.appendEvent(taskId, "ERROR", {
         message: errorMessage,
       })
-      
-      throw error
+
+      return {
+        success: false,
+        diffPath: "",
+        logPath: "",
+        sessionId: "",
+        errorMessage,
+      }
     }
   }
 }
@@ -92,10 +97,17 @@ export async function runSession(
   )
 
   if (!result.success) {
-    throw new Error(result.errorMessage || "Coding session failed")
+    return {
+      success: false,
+      diffPath: result.diffPath || "",
+      logPath: result.logPath || "",
+      sessionId: result.sessionId,
+      errorMessage: result.errorMessage || "Coding session failed",
+    }
   }
 
   return {
+    success: true,
     diffPath: result.diffPath || "",
     logPath: result.logPath || "",
     sessionId: result.sessionId,

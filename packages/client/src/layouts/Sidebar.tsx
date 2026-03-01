@@ -13,7 +13,7 @@ export function Sidebar() {
     <aside className="w-64 bg-sidebar text-text flex flex-col border-r border-border">
       <div className="p-4 border-b border-border">
         <img
-          src="/assets/dash-ai-logo.png"
+          src="/assets/agent-dash-logo.png"
           alt="Dash AI"
           style={{ mixBlendMode: "screen" }}
           className="w-full"
