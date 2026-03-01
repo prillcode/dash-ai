@@ -11,8 +11,13 @@ export function Sidebar() {
 
   return (
     <aside className="w-64 bg-sidebar text-text flex flex-col border-r border-border">
-      <div className="p-4 border-b border-border">
-        <h1 className="text-xl font-bold text-accent">Dash AI</h1>
+      <div className="p-4 border-b border-border flex items-center">
+        <img
+          src="/assets/dash-ai-logo.png"
+          alt="Dash AI"
+          style={{ mixBlendMode: "screen" }}
+          className="h-10 w-auto"
+        />
       </div>
       <nav className="flex-1 p-4">
         <ul className="space-y-1">

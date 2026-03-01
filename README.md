@@ -1,4 +1,6 @@
-# Dash AI
+<p align="center">
+  <img src="public/assets/dash-ai-logo.png" alt="Dash AI" width="320" />
+</p>
 
 A self-hosted, planning-first AI kanban board for managing coding tasks across local repos. Submit a task, let an AI planner generate a spec, review and iterate on it, then approve it for coding — all from the dashboard.
 
@@ -213,7 +215,7 @@ pm2 restart dash-ai
 | Backend | Hono + `@hono/node-server` |
 | Database | SQLite (`better-sqlite3`) + Drizzle ORM |
 | Frontend | React 18 + TypeScript + Vite |
-| Styling | Tailwind CSS v3 |
+| Styling | Tailwind CSS v4 |
 | Data fetching | TanStack Query v5 |
 | Forms | React Hook Form + Zod |
 | Routing | React Router v6 |
