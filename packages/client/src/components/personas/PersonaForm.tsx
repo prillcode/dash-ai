@@ -18,7 +18,7 @@ function MarkdownPreview({ content }: MarkdownPreviewProps) {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!content.trim()) {
-        setHtml("<p class='text-gray-400 italic'>Preview will appear here</p>")
+        setHtml("<p class='text-subtle italic'>Preview will appear here</p>")
         return
       }
       
@@ -31,7 +31,7 @@ function MarkdownPreview({ content }: MarkdownPreviewProps) {
         setHtml(parsed)
       } catch (err: any) {
         console.error("Markdown parse error:", err)
-        setHtml(`<p class="text-red-600">Error rendering markdown: ${err.message}</p>`)
+        setHtml(`<p class="text-danger">Error rendering markdown: ${err.message}</p>`)
       }
     }, 300)
 
@@ -119,11 +119,9 @@ export function PersonaForm({ initialData, onSubmit, isLoading }: PersonaFormPro
     const preset = PERSONA_PRESETS[type as keyof typeof PERSONA_PRESETS]
     if (!preset) return
 
-    // Auto-fill provider, model, allowedTools from preset
     setValue("provider", preset.provider)
     setValue("model", preset.model)
     setValue("allowedTools", preset.allowedTools)
-    // Pre-fill description only if currently empty
     if (!watch("description")) {
       setValue("description", preset.description)
     }
@@ -131,13 +129,13 @@ export function PersonaForm({ initialData, onSubmit, isLoading }: PersonaFormPro
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      {/* Persona Type — shown first so it can pre-fill other fields */}
+      {/* Persona Type */}
       <div className="space-y-1">
-        <label className="block text-sm font-medium text-gray-700">Type</label>
+        <label className="block text-sm font-medium text-muted">Type</label>
         <select
           value={currentType}
           onChange={(e) => handleTypeChange(e.target.value)}
-          className="w-full px-3 py-2 border rounded-md text-sm"
+          className="form-input w-full px-3 py-2 text-sm"
         >
           <option value={PersonaType.PLANNER}>Planner — reads codebase, writes plans (no bash)</option>
           <option value={PersonaType.CODER}>Coder — executes plans, writes code, runs builds</option>
@@ -145,7 +143,7 @@ export function PersonaForm({ initialData, onSubmit, isLoading }: PersonaFormPro
           <option value={PersonaType.CUSTOM}>Custom — configure manually</option>
         </select>
         {currentType !== PersonaType.CUSTOM && (
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-subtle mt-1">
             Provider, model, and allowed tools have been pre-filled for this type. You can override them below.
           </p>
         )}
@@ -159,17 +157,17 @@ export function PersonaForm({ initialData, onSubmit, isLoading }: PersonaFormPro
       />
       <div className="space-y-1">
         <div className="flex items-center justify-between">
-          <label className="block text-sm font-medium text-gray-700">Description</label>
+          <label className="block text-sm font-medium text-muted">Description</label>
           <button
             type="button"
             onClick={() => setDescriptionPreview(!descriptionPreview)}
-            className="text-sm text-blue-600 hover:text-blue-800"
+            className="text-sm text-accent hover:text-accent-hover"
           >
             {descriptionPreview ? "Edit" : "Preview"}
           </button>
         </div>
         {descriptionPreview ? (
-          <div className="border border-gray-300 rounded-md p-3 bg-gray-50 min-h-[100px] overflow-auto">
+          <div className="form-input p-3 min-h-[100px] overflow-auto">
             <MarkdownPreview content={watch("description") ?? ""} />
           </div>
         ) : (
@@ -177,29 +175,29 @@ export function PersonaForm({ initialData, onSubmit, isLoading }: PersonaFormPro
             {...register("description")}
             placeholder="Brief description of this persona"
             rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="form-input w-full px-3 py-2"
           />
         )}
         {errors.description && (
-          <p className="text-sm text-red-600 mt-1">
+          <p className="text-sm text-danger mt-1">
             {String((errors.description as { message?: unknown }).message ?? "")}
           </p>
         )}
       </div>
       <div className="space-y-1">
         <div className="flex items-center justify-between">
-          <label className="block text-sm font-medium text-gray-700">System Prompt</label>
+          <label className="block text-sm font-medium text-muted">System Prompt</label>
           <button
             type="button"
             onClick={() => setSystemPromptPreview(!systemPromptPreview)}
-            className="text-sm text-blue-600 hover:text-blue-800"
+            className="text-sm text-accent hover:text-accent-hover"
           >
             {systemPromptPreview ? "Edit" : "Preview"}
           </button>
         </div>
-        <p className="text-xs text-gray-500 mb-2">Markdown supported (headings, lists, code blocks, etc.)</p>
+        <p className="text-xs text-subtle mb-2">Markdown supported (headings, lists, code blocks, etc.)</p>
         {systemPromptPreview ? (
-          <div className="border border-gray-300 rounded-md p-3 bg-gray-50 min-h-[300px] overflow-auto">
+          <div className="form-input p-3 min-h-[300px] overflow-auto">
             <MarkdownPreview content={watch("systemPrompt") ?? ""} />
           </div>
         ) : (
@@ -207,11 +205,11 @@ export function PersonaForm({ initialData, onSubmit, isLoading }: PersonaFormPro
             {...register("systemPrompt")}
             placeholder="You are a senior engineer..."
             rows={12}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+            className="form-input w-full px-3 py-2 font-mono text-sm"
           />
         )}
         {errors.systemPrompt && (
-          <p className="text-sm text-red-600 mt-1">
+          <p className="text-sm text-danger mt-1">
             {String((errors.systemPrompt as { message?: unknown }).message ?? "")}
           </p>
         )}
@@ -219,36 +217,35 @@ export function PersonaForm({ initialData, onSubmit, isLoading }: PersonaFormPro
 
       {/* Provider + Model cascading selects */}
       <div className="space-y-1">
-        <label className="block text-sm font-medium text-gray-700">Provider</label>
+        <label className="block text-sm font-medium text-muted">Provider</label>
         {modelsData ? (
           <select
             value={watch("provider") ?? "anthropic"}
             onChange={(e) => {
               const newProvider = e.target.value
               setValue("provider", newProvider)
-              // Reset model to first model of new provider
               const providerEntry = modelsData.providers.find(p => p.id === newProvider)
               if (providerEntry?.models[0]) setValue("model", providerEntry.models[0].id)
             }}
-            className="w-full px-3 py-2 border rounded-md text-sm"
+            className="form-input w-full px-3 py-2 text-sm"
           >
             {modelsData.providers.map(p => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
         ) : (
-          <select disabled className="w-full px-3 py-2 border rounded-md text-sm text-gray-400">
+          <select disabled className="form-input w-full px-3 py-2 text-sm opacity-50">
             <option>Loading providers...</option>
           </select>
         )}
       </div>
       <div className="space-y-1">
-        <label className="block text-sm font-medium text-gray-700">Model</label>
+        <label className="block text-sm font-medium text-muted">Model</label>
         {modelsData ? (
           <select
             value={watch("model") ?? ""}
             onChange={(e) => setValue("model", e.target.value)}
-            className="w-full px-3 py-2 border rounded-md text-sm"
+            className="form-input w-full px-3 py-2 text-sm"
           >
             {modelsData.providers
               .find(p => p.id === (watch("provider") ?? "anthropic"))
@@ -259,7 +256,7 @@ export function PersonaForm({ initialData, onSubmit, isLoading }: PersonaFormPro
               ))}
           </select>
         ) : (
-          <select disabled className="w-full px-3 py-2 border rounded-md text-sm text-gray-400">
+          <select disabled className="form-input w-full px-3 py-2 text-sm opacity-50">
             <option>Loading models...</option>
           </select>
         )}

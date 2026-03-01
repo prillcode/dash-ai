@@ -25,7 +25,7 @@ export function DiffReviewPanel({ taskId, status }: DiffReviewPanelProps) {
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 text-red-600 rounded-lg">
+      <div className="error-banner">
         Failed to load diff: {error.message}
       </div>
     )
@@ -33,18 +33,18 @@ export function DiffReviewPanel({ taskId, status }: DiffReviewPanelProps) {
 
   if (!diff) {
     return (
-      <div className="p-4 bg-gray-50 text-gray-500 rounded-lg">
+      <div className="card p-4 text-muted">
         No diff available
       </div>
     )
   }
 
   return (
-    <div className="border rounded-lg overflow-hidden">
-      <div className="bg-gray-100 px-4 py-2 border-b font-medium">
+    <div className="card overflow-hidden">
+      <div className="bg-hover-subtle px-4 py-2 border-b border-border font-medium text-sm text-muted">
         Changes
       </div>
-      <pre className="p-4 text-sm overflow-x-auto bg-gray-50">{diff}</pre>
+      <pre className="p-4 text-sm overflow-x-auto bg-hover text-text font-mono">{diff}</pre>
     </div>
   )
 }

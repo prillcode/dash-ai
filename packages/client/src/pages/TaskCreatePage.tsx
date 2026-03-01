@@ -25,7 +25,7 @@ export function TaskCreatePage() {
         </Button>
       </div>
 
-      <div className="border rounded-lg p-6 bg-white">
+      <div className="card p-6">
         <TaskForm onSubmit={handleSubmit} isLoading={createTask.isPending} />
       </div>
     </div>

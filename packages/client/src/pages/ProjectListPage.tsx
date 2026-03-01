@@ -17,7 +17,7 @@ export function ProjectListPage() {
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 text-red-600 rounded-lg">
+      <div className="error-banner">
         Error loading projects: {error.message}
       </div>
     )
@@ -47,26 +47,23 @@ export function ProjectListPage() {
           {projects.map((project) => (
             <div
               key={project.id}
-              className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow"
+              className="card p-4 hover:border-accent/40 transition-colors"
             >
               <div className="flex items-start justify-between">
                 <div className="space-y-1 flex-1">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-lg">{project.name}</h3>
                     <span
-                      className={`px-2 py-1 text-xs rounded-full ${project.isActive
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-800"
-                        }`}
+                      className={`pill ${project.isActive ? "pill-active" : "pill-inactive"}`}
                     >
                       {project.isActive ? "Active" : "Inactive"}
                     </span>
                   </div>
-                  <div className="text-sm text-gray-600">
-                    <code className="bg-gray-100 px-1 rounded">{project.resolvedPath}</code>
+                  <div className="text-sm">
+                    <span className="code-inline">{project.resolvedPath}</span>
                   </div>
                   {project.description && (
-                    <p className="text-gray-700 mt-2">{project.description}</p>
+                    <p className="text-muted mt-2">{project.description}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2">

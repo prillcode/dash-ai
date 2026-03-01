@@ -20,8 +20,8 @@ function renderEventContent(event: TaskEvent) {
       return (
         <div className="text-sm">
           <span className="font-medium">Status changed:</span>{" "}
-          <span className="text-gray-600">{payload.from}</span> →{" "}
-          <span className="text-blue-600">{payload.to}</span>
+          <span className="text-muted">{payload.from}</span> →{" "}
+          <span className="text-accent">{payload.to}</span>
         </div>
       )
     }
@@ -34,8 +34,8 @@ function renderEventContent(event: TaskEvent) {
       return (
         <div className="text-sm">
           <span className="font-medium">Tool:</span>{" "}
-          <span className="text-purple-600">{payload.tool}</span>{" "}
-          <span className="text-gray-400">({payload.durationMs}ms)</span>{" "}
+          <span className="text-purple">{payload.tool}</span>{" "}
+          <span className="text-subtle">({payload.durationMs}ms)</span>{" "}
           {payload.success ? "✓" : "✗"}
         </div>
       )
@@ -43,7 +43,7 @@ function renderEventContent(event: TaskEvent) {
     case "AGENT_OUTPUT": {
       const payload = event.payload as { text: string }
       return (
-        <div className="text-sm text-gray-700 whitespace-pre-wrap">
+        <div className="text-sm text-text whitespace-pre-wrap">
           {payload.text}
         </div>
       )
@@ -51,7 +51,7 @@ function renderEventContent(event: TaskEvent) {
     case "ERROR": {
       const payload = event.payload as { message: string }
       return (
-        <div className="text-sm text-red-600">
+        <div className="text-sm text-danger">
           <span className="font-medium">Error:</span> {payload.message}
         </div>
       )
@@ -65,16 +65,16 @@ function renderEventContent(event: TaskEvent) {
       return (
         <div className="text-sm">
           <span className="font-medium">Review:</span>{" "}
-          <span className={payload.action === "APPROVED" ? "text-green-600" : "text-red-600"}>
+          <span className={payload.action === "APPROVED" ? "text-success" : "text-danger"}>
             {payload.action}
           </span>{" "}
           by {payload.reviewedBy}
-          {payload.note && <span className="text-gray-500"> - {payload.note}</span>}
+          {payload.note && <span className="text-muted"> - {payload.note}</span>}
         </div>
       )
     }
     default:
-      return <div className="text-sm text-gray-500">{event.eventType}</div>
+      return <div className="text-sm text-muted">{event.eventType}</div>
   }
 }
 
@@ -91,7 +91,7 @@ export function TaskTimelinePanel({ taskId, taskStatus }: TaskTimelinePanelProps
 
   if (events.length === 0) {
     return (
-      <div className="flex items-center justify-center py-8 text-gray-500">
+      <div className="flex items-center justify-center py-8 text-muted">
         {isRunning ? (
           <>
             <Spinner className="mr-2" />
@@ -107,11 +107,11 @@ export function TaskTimelinePanel({ taskId, taskStatus }: TaskTimelinePanelProps
   return (
     <div
       ref={containerRef}
-      className="space-y-2 max-h-96 overflow-y-auto p-4 bg-gray-50 rounded-lg"
+      className="scroll-panel"
     >
       {events.map((event) => (
         <div key={event.id} className="flex items-start gap-3">
-          <span className="text-xs text-gray-400 whitespace-nowrap">
+          <span className="text-xs text-subtle whitespace-nowrap">
             {formatEventTime(event.createdAt)}
           </span>
           <div className="flex-1">{renderEventContent(event)}</div>

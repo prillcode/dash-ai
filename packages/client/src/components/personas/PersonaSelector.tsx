@@ -18,7 +18,7 @@ export function PersonaSelector({
 
   if (isLoading) {
     return (
-      <select disabled className={`w-full px-3 py-2 border rounded-md bg-gray-50 ${className}`}>
+      <select disabled className={`form-input w-full px-3 py-2 opacity-50 ${className}`}>
         <option>Loading personas...</option>
       </select>
     )
@@ -33,7 +33,7 @@ export function PersonaSelector({
           onChange(selected.id, selected.name)
         }
       }}
-      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
+      className={`form-input w-full px-3 py-2 ${className}`}
     >
       <option value="" disabled>
         {placeholder}

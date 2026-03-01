@@ -7,12 +7,12 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 const colorStyles: Record<BadgeColor, string> = {
-  gray: "bg-gray-100 text-gray-800",
-  blue: "bg-blue-100 text-blue-800",
-  green: "bg-green-100 text-green-800",
-  yellow: "bg-yellow-100 text-yellow-800",
-  red: "bg-red-100 text-red-800",
-  purple: "bg-purple-100 text-purple-800",
+  gray:   "bg-hover-subtle text-muted border border-border",
+  blue:   "bg-accent-bg text-accent border border-accent/30",
+  green:  "bg-success-bg text-success border border-success/30",
+  yellow: "bg-warn-bg text-warn border border-warn/30",
+  red:    "bg-danger-bg text-danger border border-danger/30",
+  purple: "bg-purple-bg text-purple border border-purple/30",
 }
 
 export function Badge({ color = "gray", className = "", ...props }: BadgeProps) {

@@ -10,9 +10,9 @@ export function TaskFilterBar({ filters, onFilterChange }: TaskFilterBarProps) {
   const { data: personas } = usePersonas(true)
 
   return (
-    <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+    <div className="filter-bar">
       <div className="flex items-center gap-2">
-        <label className="text-sm font-medium text-gray-700">Status:</label>
+        <label className="text-sm font-medium text-muted">Status:</label>
         <select
           value={filters.status || ""}
           onChange={(e) =>
@@ -21,7 +21,7 @@ export function TaskFilterBar({ filters, onFilterChange }: TaskFilterBarProps) {
               status: e.target.value || undefined,
             })
           }
-          className="px-3 py-1.5 border rounded-md text-sm"
+          className="form-input px-3 py-1.5 text-sm"
         >
           <option value="">All</option>
           {Object.values(TaskStatus).map((status) => (
@@ -33,7 +33,7 @@ export function TaskFilterBar({ filters, onFilterChange }: TaskFilterBarProps) {
       </div>
 
       <div className="flex items-center gap-2">
-        <label className="text-sm font-medium text-gray-700">Persona:</label>
+        <label className="text-sm font-medium text-muted">Persona:</label>
         <select
           value={filters.personaId || ""}
           onChange={(e) =>
@@ -42,7 +42,7 @@ export function TaskFilterBar({ filters, onFilterChange }: TaskFilterBarProps) {
               personaId: e.target.value || undefined,
             })
           }
-          className="px-3 py-1.5 border rounded-md text-sm"
+          className="form-input px-3 py-1.5 text-sm"
         >
           <option value="">All</option>
           {personas?.map((p) => (
@@ -54,7 +54,7 @@ export function TaskFilterBar({ filters, onFilterChange }: TaskFilterBarProps) {
       </div>
 
       <div className="flex items-center gap-2">
-        <label className="text-sm font-medium text-gray-700">Priority:</label>
+        <label className="text-sm font-medium text-muted">Priority:</label>
         <select
           value={filters.priority?.toString() || ""}
           onChange={(e) =>
@@ -63,7 +63,7 @@ export function TaskFilterBar({ filters, onFilterChange }: TaskFilterBarProps) {
               priority: e.target.value ? parseInt(e.target.value) : undefined,
             })
           }
-          className="px-3 py-1.5 border rounded-md text-sm"
+          className="form-input px-3 py-1.5 text-sm"
         >
           <option value="">All</option>
           {[1, 2, 3, 4, 5].map((p) => (
@@ -76,7 +76,7 @@ export function TaskFilterBar({ filters, onFilterChange }: TaskFilterBarProps) {
 
       <button
         onClick={() => onFilterChange({})}
-        className="text-sm text-blue-600 hover:text-blue-800"
+        className="text-sm text-accent hover:text-accent-hover"
       >
         Clear filters
       </button>

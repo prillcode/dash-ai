@@ -20,7 +20,7 @@ export function TaskQueuePage() {
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 text-red-600 rounded-lg">
+      <div className="error-banner">
         Error loading tasks: {error.message}
       </div>
     )

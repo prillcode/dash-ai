@@ -12,7 +12,7 @@ export function PersonaCard({ persona, onToggle, onDelete }: PersonaCardProps) {
   const navigate = useNavigate()
 
   return (
-    <div className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+    <div className="card p-4 hover:border-accent/40 transition-colors">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2">
@@ -21,7 +21,7 @@ export function PersonaCard({ persona, onToggle, onDelete }: PersonaCardProps) {
               {persona.isActive ? "Active" : "Inactive"}
             </Badge>
           </div>
-          <p className="text-sm text-gray-500 mt-1 line-clamp-2">{persona.description}</p>
+          <p className="text-sm text-muted mt-1 line-clamp-2">{persona.description}</p>
           <div className="flex items-center gap-2 mt-2">
             <Badge color="blue">{persona.model}</Badge>
             {persona.tags.slice(0, 3).map((tag) => (
@@ -32,19 +32,19 @@ export function PersonaCard({ persona, onToggle, onDelete }: PersonaCardProps) {
         <div className="flex items-center gap-2 ml-4">
           <button
             onClick={() => navigate(`/personas/${persona.id}/edit`)}
-            className="text-blue-600 hover:text-blue-800 text-sm"
+            className="text-accent hover:text-accent-hover text-sm"
           >
             Edit
           </button>
           <button
             onClick={() => onToggle(persona.id)}
-            className="text-gray-600 hover:text-gray-800 text-sm"
+            className="text-muted hover:text-text text-sm"
           >
             {persona.isActive ? "Disable" : "Enable"}
           </button>
           <button
             onClick={() => onDelete(persona.id)}
-            className="text-red-600 hover:text-red-800 text-sm"
+            className="text-danger hover:text-danger-hover text-sm"
           >
             Delete
           </button>

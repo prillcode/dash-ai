@@ -22,13 +22,13 @@ export function FormField({
   rows = 4,
   step,
 }: FormFieldProps) {
-  const inputClasses = `w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-    error ? "border-red-500" : "border-gray-300"
+  const inputClasses = `w-full px-3 py-2 bg-input border rounded-md text-text placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent ${
+    error ? "border-danger" : "border-border"
   }`
 
   return (
     <div className="space-y-1">
-      <label className="block text-sm font-medium text-gray-700">{label}</label>
+      <label className="block text-sm font-medium text-muted">{label}</label>
       {type === "textarea" ? (
         <textarea
           {...register}
@@ -50,7 +50,7 @@ export function FormField({
         />
       )}
       {error && typeof error === 'object' && 'message' in error ? (
-        <p className="text-sm text-red-600">{String((error as { message: unknown }).message)}</p>
+        <p className="text-sm text-danger">{String((error as { message: unknown }).message)}</p>
       ) : null}
     </div>
   )

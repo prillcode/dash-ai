@@ -55,17 +55,13 @@ export function ProjectForm({ initialData, onSubmit, isLoading }: ProjectFormPro
 
   const validationMessage = () => {
     if (!watchedPath || watchedPath.length === 0) return null
-    if (validating) return <span className="text-gray-500">Checking path…</span>
-    if (validationError) return <span className="text-red-600">Could not validate path</span>
+    if (validating) return <span className="text-muted">Checking path…</span>
+    if (validationError) return <span className="text-danger">Could not validate path</span>
     if (validation) {
       if (validation.valid) {
-        return (
-          <span className="text-green-700">
-            ✓ {validation.resolvedPath}
-          </span>
-        )
+        return <span className="text-success">✓ {validation.resolvedPath}</span>
       } else {
-        return <span className="text-red-600">{validation.error}</span>
+        return <span className="text-danger">{validation.error}</span>
       }
     }
     return null
@@ -88,16 +84,16 @@ export function ProjectForm({ initialData, onSubmit, isLoading }: ProjectFormPro
         rows={4}
       />
       <div className="space-y-1">
-        <label className="block text-sm font-medium text-gray-700">Path</label>
+        <label className="block text-sm font-medium text-muted">Path</label>
         <input
           {...register("path")}
           placeholder="~ /home/user/projects/my-app"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="form-input w-full px-3 py-2"
         />
         <div className="text-sm mt-1 min-h-[1.5rem]">
           {validationMessage()}
         </div>
-        {errors.path && <p className="text-sm text-red-600 mt-1">{errors.path.message}</p>}
+        {errors.path && <p className="text-sm text-danger mt-1">{errors.path.message}</p>}
       </div>
       <div className="flex justify-end gap-2">
         <Button

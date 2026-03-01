@@ -18,7 +18,7 @@ export function ProjectSelector({
 
   if (isLoading) {
     return (
-      <select disabled className={`w-full px-3 py-2 border rounded-md bg-gray-50 ${className}`}>
+      <select disabled className={`form-input w-full px-3 py-2 opacity-50 ${className}`}>
         <option>Loading projects...</option>
       </select>
     )
@@ -26,7 +26,7 @@ export function ProjectSelector({
 
   if (!projects || projects.length === 0) {
     return (
-      <select disabled className={`w-full px-3 py-2 border rounded-md bg-gray-50 ${className}`}>
+      <select disabled className={`form-input w-full px-3 py-2 opacity-50 ${className}`}>
         <option>No projects registered — add one in Projects settings</option>
       </select>
     )
@@ -41,7 +41,7 @@ export function ProjectSelector({
           onChange(selected.id, selected.name, selected.resolvedPath)
         }
       }}
-      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
+      className={`form-input w-full px-3 py-2 ${className}`}
     >
       <option value="" disabled>
         {placeholder}

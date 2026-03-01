@@ -1,16 +1,18 @@
 import { ButtonHTMLAttributes, forwardRef } from "react"
 
-type ButtonVariant = "default" | "ghost" | "destructive" | "success"
+type ButtonVariant = "default" | "primary" | "secondary" | "ghost" | "destructive" | "success"
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-  default: "bg-blue-600 text-white hover:bg-blue-700",
-  ghost: "bg-transparent text-gray-700 hover:bg-gray-100",
-  destructive: "bg-red-600 text-white hover:bg-red-700",
-  success: "bg-green-600 text-white hover:bg-green-700",
+  default:     "bg-accent text-bg hover:bg-accent-hover",
+  primary:     "bg-accent text-bg hover:bg-accent-hover",
+  secondary:   "bg-hover-subtle text-text hover:bg-border",
+  ghost:       "bg-transparent text-muted hover:bg-hover-subtle hover:text-text",
+  destructive: "bg-danger text-white hover:bg-danger-hover",
+  success:     "bg-success text-bg hover:bg-success-hover",
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
