@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -5,6 +6,40 @@ import { Button, FormField } from "../ui"
 import type { Persona, PersonaInput } from "../../types/persona"
 import { PersonaType, PERSONA_PRESETS } from "../../types/persona"
 import { useModels } from "../../api/personas"
+import { marked } from "marked"
+
+interface MarkdownPreviewProps {
+  content: string
+}
+
+function MarkdownPreview({ content }: MarkdownPreviewProps) {
+  const [html, setHtml] = useState("")
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!content.trim()) {
+        setHtml("<p class='text-gray-400 italic'>Preview will appear here</p>")
+        return
+      }
+      
+      try {
+        const parsed = marked.parse(content, {
+          async: false,
+          gfm: true,
+          breaks: true,
+        }) as string
+        setHtml(parsed)
+      } catch (err: any) {
+        console.error("Markdown parse error:", err)
+        setHtml(`<p class="text-red-600">Error rendering markdown: ${err.message}</p>`)
+      }
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [content])
+
+  return <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: html }} />
+}
 
 const personaSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -27,11 +62,15 @@ interface PersonaFormProps {
 export function PersonaForm({ initialData, onSubmit, isLoading }: PersonaFormProps) {
   const { data: modelsData } = useModels()
 
+  const [descriptionPreview, setDescriptionPreview] = useState(false)
+  const [systemPromptPreview, setSystemPromptPreview] = useState(false)
+
   const {
     register,
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors },
   } = useForm<PersonaInput>({
     resolver: zodResolver(personaSchema),
@@ -54,6 +93,22 @@ export function PersonaForm({ initialData, onSubmit, isLoading }: PersonaFormPro
           allowedTools: [],
         },
   })
+
+  useEffect(() => {
+    if (initialData) {
+      reset({
+        name: initialData.name,
+        description: initialData.description,
+        personaType: initialData.personaType ?? "custom",
+        systemPrompt: initialData.systemPrompt,
+        model: initialData.model,
+        provider: initialData.provider ?? "anthropic",
+        allowedTools: initialData.allowedTools,
+        contextFiles: initialData.contextFiles,
+        tags: initialData.tags,
+      })
+    }
+  }, [initialData, reset])
 
   const currentType = watch("personaType") ?? "custom"
 
@@ -102,20 +157,65 @@ export function PersonaForm({ initialData, onSubmit, isLoading }: PersonaFormPro
         error={errors.name}
         placeholder="e.g., Planner"
       />
-      <FormField
-        label="Description"
-        register={register("description")}
-        error={errors.description}
-        placeholder="Brief description of this persona"
-      />
-      <FormField
-        label="System Prompt"
-        type="textarea"
-        register={register("systemPrompt")}
-        error={errors.systemPrompt}
-        placeholder="You are a senior engineer..."
-        rows={6}
-      />
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-medium text-gray-700">Description</label>
+          <button
+            type="button"
+            onClick={() => setDescriptionPreview(!descriptionPreview)}
+            className="text-sm text-blue-600 hover:text-blue-800"
+          >
+            {descriptionPreview ? "Edit" : "Preview"}
+          </button>
+        </div>
+        {descriptionPreview ? (
+          <div className="border border-gray-300 rounded-md p-3 bg-gray-50 min-h-[100px] overflow-auto">
+            <MarkdownPreview content={watch("description") ?? ""} />
+          </div>
+        ) : (
+          <textarea
+            {...register("description")}
+            placeholder="Brief description of this persona"
+            rows={4}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        )}
+        {errors.description && (
+          <p className="text-sm text-red-600 mt-1">
+            {String((errors.description as { message?: unknown }).message ?? "")}
+          </p>
+        )}
+      </div>
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-medium text-gray-700">System Prompt</label>
+          <button
+            type="button"
+            onClick={() => setSystemPromptPreview(!systemPromptPreview)}
+            className="text-sm text-blue-600 hover:text-blue-800"
+          >
+            {systemPromptPreview ? "Edit" : "Preview"}
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mb-2">Markdown supported (headings, lists, code blocks, etc.)</p>
+        {systemPromptPreview ? (
+          <div className="border border-gray-300 rounded-md p-3 bg-gray-50 min-h-[300px] overflow-auto">
+            <MarkdownPreview content={watch("systemPrompt") ?? ""} />
+          </div>
+        ) : (
+          <textarea
+            {...register("systemPrompt")}
+            placeholder="You are a senior engineer..."
+            rows={12}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+          />
+        )}
+        {errors.systemPrompt && (
+          <p className="text-sm text-red-600 mt-1">
+            {String((errors.systemPrompt as { message?: unknown }).message ?? "")}
+          </p>
+        )}
+      </div>
 
       {/* Provider + Model cascading selects */}
       <div className="space-y-1">
@@ -165,25 +265,20 @@ export function PersonaForm({ initialData, onSubmit, isLoading }: PersonaFormPro
         )}
       </div>
 
-      <div className="space-y-1">
-        <label className="block text-sm font-medium text-gray-700">Allowed Tools (comma-separated)</label>
-        <input
-          type="text"
-          value={(watch("allowedTools") ?? []).join(", ")}
-          onChange={(e) => {
-            const tools = e.target.value
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean)
-            setValue("allowedTools", tools)
-          }}
-          placeholder="bash, read, write, edit, glob, grep"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-        />
-        {errors.allowedTools && (
-          <p className="text-sm text-red-600">{String((errors.allowedTools as { message?: unknown }).message ?? "")}</p>
-        )}
-      </div>
+      <FormField
+        label="Allowed Tools (comma-separated)"
+        register={register("allowedTools", {
+          setValueAs: (v) =>
+            v
+              ? String(v)
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+              : [],
+        })}
+        error={errors.allowedTools}
+        placeholder="bash, read, write, edit, glob, grep"
+      />
       <FormField
         label="Context Files (comma-separated)"
         register={register("contextFiles", {

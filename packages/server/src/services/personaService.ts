@@ -64,7 +64,10 @@ export async function listPersonas(activeOnly = true): Promise<ParsedPersona[]> 
 
 export async function getPersona(id: string): Promise<ParsedPersona | null> {
   const [row] = await db.select().from(personas).where(eq(personas.id, id))
-  return row ? parsePersona(row) : null
+  console.log('getPersona row:', row?.personaType, row?.provider, row?.model)
+  const parsed = row ? parsePersona(row) : null
+  console.log('getPersona parsed:', parsed?.personaType, parsed?.provider, parsed?.model)
+  return parsed
 }
 
 export async function createPersona(input: PersonaInput): Promise<ParsedPersona> {
@@ -92,6 +95,7 @@ export async function createPersona(input: PersonaInput): Promise<ParsedPersona>
 }
 
 export async function updatePersona(id: string, input: Partial<PersonaInput>): Promise<ParsedPersona | null> {
+  console.log('updatePersona called:', id, input)
   const serialized = input.allowedTools || input.contextFiles || input.tags
     ? {
         allowedTools: JSON.stringify(input.allowedTools || []),
@@ -99,6 +103,7 @@ export async function updatePersona(id: string, input: Partial<PersonaInput>): P
         tags: JSON.stringify(input.tags || []),
       }
     : {}
+  console.log('serialized:', serialized)
   
   const [row] = await db.update(personas)
     .set({
@@ -109,6 +114,7 @@ export async function updatePersona(id: string, input: Partial<PersonaInput>): P
     .where(eq(personas.id, id))
     .returning()
   
+  console.log('update result row:', row)
   return row ? parsePersona(row) : null
 }
 

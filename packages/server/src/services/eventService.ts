@@ -10,6 +10,7 @@ type TaskEvent = typeof taskEvents.$inferSelect
 export interface StatusChangePayload {
   from: string
   to: string
+  message?: string
 }
 
 export interface ToolCallPayload {
@@ -35,12 +36,23 @@ export interface ReviewActionPayload {
   note?: string
 }
 
+export type PlanningEventPayload = Record<string, unknown>
+
+export type CodingEventPayload = Record<string, unknown>
+
+export interface PlanFeedbackPayload {
+  feedback: string
+}
+
 export type EventPayload =
   | StatusChangePayload
   | ToolCallPayload
   | AgentOutputPayload
   | ErrorPayload
   | ReviewActionPayload
+  | PlanningEventPayload
+  | CodingEventPayload
+  | PlanFeedbackPayload
 
 export type EventType =
   | "STATUS_CHANGE"
@@ -48,6 +60,9 @@ export type EventType =
   | "AGENT_OUTPUT"
   | "ERROR"
   | "REVIEW_ACTION"
+  | "PLANNING_EVENT"
+  | "CODING_EVENT"
+  | "PLAN_FEEDBACK"
 
 function parseEvent(row: TaskEvent) {
   return {

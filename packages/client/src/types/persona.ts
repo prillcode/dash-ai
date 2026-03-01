@@ -21,7 +21,7 @@ export const PERSONA_PRESETS: Record<PersonaTypeValue, PersonaPreset> = {
     type: "planner",
     label: "Planner",
     description: "Reads the codebase and produces detailed PLAN.md files. Does not write code.",
-    allowedTools: ["read", "write", "edit", "glob", "grep"],
+    allowedTools: ["bash", "read", "write", "edit", "glob", "grep", "task", "webfetch", "todowrite", "question"],
     provider: "anthropic",
     model: "claude-opus-4-5",
   },

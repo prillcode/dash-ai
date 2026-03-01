@@ -11,11 +11,12 @@ export function usePersonas(activeOnly = true) {
   })
 }
 
-export function usePersona(id: string) {
+export function usePersona(id: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["persona", id],
     queryFn: () => apiClient<Persona>(`/api/personas/${id}`),
     staleTime: 60_000,
+    enabled: options?.enabled ?? true,
   })
 }
 
@@ -41,8 +42,9 @@ export function useUpdatePersona() {
         method: "PUT",
         body: JSON.stringify(input),
       }),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["personas"] })
+      queryClient.invalidateQueries({ queryKey: ["persona", variables.id] })
     },
   })
 }
@@ -67,8 +69,9 @@ export function useDeletePersona() {
       apiClient<{ success: boolean }>(`/api/personas/${id}`, {
         method: "DELETE",
       }),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["personas"] })
+      queryClient.invalidateQueries({ queryKey: ["persona", variables] })
     },
   })
 }
@@ -78,6 +81,6 @@ export function useModels() {
     queryKey: ["models"],
     queryFn: () =>
       apiClient<{ providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; note?: string }> }> }>("/api/models"),
-    staleTime: Infinity,
+    staleTime: 60_000, // 1 minute
   })
 }
