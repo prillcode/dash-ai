@@ -11,6 +11,19 @@ export function Sidebar() {
 
   return (
     <aside className="w-64 bg-sidebar text-text flex flex-col border-r border-border">
+      <div className="border-b border-border p-4">
+        <div className="bg-hover-subtle rounded-lg p-3">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold">Task Queue</span>
+            <select className="bg-input border border-border rounded-md text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-accent/40">
+              <option value="all">Status: All</option>
+              <option value="queued">Status: Queued</option>
+              <option value="running">Status: Running</option>
+              <option value="completed">Status: Completed</option>
+            </select>
+          </div>
+        </div>
+      </div>
       <nav className="flex-1 p-4">
         <ul className="space-y-1">
           {navItems.map((item) => {
@@ -35,7 +48,7 @@ export function Sidebar() {
       </nav>
       <div className="border-t border-border">
         <img
-          src="/assets/dash-ai-logo.png"
+          src="/assets/agent-dash-logo.png"
           alt="Dash AI"
           style={{ mixBlendMode: "screen" }}
           className="w-full"
