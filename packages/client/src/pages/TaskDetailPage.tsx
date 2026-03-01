@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom"
 import { useTask } from "../api/tasks"
-import { TaskStatusBadge, TaskActionBar } from "../components/tasks"
+import { TaskStatusBadge, TaskActionBar, PlanningSection } from "../components/tasks"
 import { TaskTimelinePanel } from "../components/timeline"
 import { DiffReviewPanel } from "../components/diff"
 import { Spinner, Badge, Button } from "../components/ui"
@@ -41,6 +41,8 @@ export function TaskDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
+          <PlanningSection task={task} />
+
           <div className="card p-4">
             <h2 className="font-semibold mb-2">Description</h2>
             <p className="text-muted whitespace-pre-wrap">{task.description}</p>
