@@ -6,7 +6,6 @@ import { marked } from "marked"
 import { Button, FormField } from "../ui"
 import { PersonaSelector } from "../personas"
 import { ProjectSelector } from "../projects"
-import type { TaskInput } from "../../types/task"
 
 interface MarkdownPreviewProps {
   content: string
@@ -18,7 +17,7 @@ function MarkdownPreview({ content }: MarkdownPreviewProps) {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!content.trim()) {
-        setHtml("<p class='text-gray-400 italic'>Preview will appear here</p>")
+        setHtml("<p class='text-subtle italic'>Preview will appear here</p>")
         return
       }
       
@@ -31,7 +30,7 @@ function MarkdownPreview({ content }: MarkdownPreviewProps) {
         setHtml(parsed)
       } catch (err: any) {
         console.error("Markdown parse error:", err)
-        setHtml(`<p class="text-red-600">Error rendering markdown: ${err.message}</p>`)
+        setHtml(`<p class="text-danger">Error rendering markdown: ${err.message}</p>`)
       }
     }, 300)
 
@@ -52,9 +51,11 @@ const taskSchema = z.object({
   priority: z.number().min(1).max(5).optional(),
 })
 
+type TaskFormData = z.infer<typeof taskSchema>
+
 interface TaskFormProps {
-  initialData?: Partial<TaskInput>
-  onSubmit: (data: TaskInput) => void
+  initialData?: Partial<TaskFormData>
+  onSubmit: (data: TaskFormData) => void
   isLoading?: boolean
 }
 
@@ -65,7 +66,7 @@ export function TaskForm({ initialData, onSubmit, isLoading }: TaskFormProps) {
     watch,
     setValue,
     formState: { errors },
-  } = useForm<TaskInput>({
+  } = useForm<TaskFormData>({
     resolver: zodResolver(taskSchema),
     defaultValues: {
       identifier: initialData?.identifier || "",
@@ -97,17 +98,17 @@ export function TaskForm({ initialData, onSubmit, isLoading }: TaskFormProps) {
       />
       <div className="space-y-1">
         <div className="flex items-center justify-between">
-          <label className="block text-sm font-medium text-gray-700">Description</label>
+          <label className="block text-sm font-medium text-muted">Description</label>
           <button
             type="button"
             onClick={() => setDescriptionPreview(!descriptionPreview)}
-            className="text-sm text-blue-600 hover:text-blue-800"
+            className="text-sm text-accent hover:text-accent-hover"
           >
             {descriptionPreview ? "Edit" : "Preview"}
           </button>
         </div>
         {descriptionPreview ? (
-          <div className="border border-gray-300 rounded-md p-3 bg-gray-50 min-h-[150px] overflow-auto">
+          <div className="form-input p-3 min-h-[150px] overflow-auto">
             <MarkdownPreview content={watch("description") ?? ""} />
           </div>
         ) : (
@@ -115,38 +116,38 @@ export function TaskForm({ initialData, onSubmit, isLoading }: TaskFormProps) {
             {...register("description")}
             placeholder="Detailed description of what the agent should do..."
             rows={6}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="form-input w-full px-3 py-2"
           />
         )}
         {errors.description && (
-          <p className="text-sm text-red-600 mt-1">
+          <p className="text-sm text-danger mt-1">
             {String((errors.description as { message?: unknown }).message ?? "")}
           </p>
         )}
       </div>
       <div className="space-y-1">
-        <label className="block text-sm font-medium text-gray-700">Coding Persona</label>
+        <label className="block text-sm font-medium text-muted">Coding Persona</label>
         <PersonaSelector
           value={watch("codingPersonaId")}
           onChange={(id, _name) => setValue("codingPersonaId", id)}
         />
-        {errors.codingPersonaId && <p className="text-sm text-red-600">{errors.codingPersonaId.message}</p>}
+        {errors.codingPersonaId && <p className="text-sm text-danger">{errors.codingPersonaId.message}</p>}
       </div>
       <div className="space-y-1">
-        <label className="block text-sm font-medium text-gray-700">Planning Persona (optional)</label>
+        <label className="block text-sm font-medium text-muted">Planning Persona (optional)</label>
         <PersonaSelector
           value={watch("planningPersonaId")}
           onChange={(id, _name) => setValue("planningPersonaId", id)}
         />
-        {errors.planningPersonaId && <p className="text-sm text-red-600">{errors.planningPersonaId.message}</p>}
+        {errors.planningPersonaId && <p className="text-sm text-danger">{errors.planningPersonaId.message}</p>}
       </div>
       <div className="space-y-1">
-        <label className="block text-sm font-medium text-gray-700">Project</label>
+        <label className="block text-sm font-medium text-muted">Project</label>
         <ProjectSelector
           value={watch("projectId")}
           onChange={(id, _name, _resolvedPath) => setValue("projectId", id)}
         />
-        {errors.projectId && <p className="text-sm text-red-600">{errors.projectId.message}</p>}
+        {errors.projectId && <p className="text-sm text-danger">{errors.projectId.message}</p>}
       </div>
       <FormField
         label="Target Files (comma-separated)"

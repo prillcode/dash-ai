@@ -42,6 +42,20 @@ export function useCreateTask() {
   })
 }
 
+export function useStartPlanning() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiClient<Task>(`/api/tasks/${id}/start-planning`, {
+        method: "POST",
+      }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+      queryClient.invalidateQueries({ queryKey: ["task", variables] })
+    },
+  })
+}
+
 export function useUpdateTaskStatus() {
   const queryClient = useQueryClient()
   return useMutation({

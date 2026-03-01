@@ -20,7 +20,7 @@ export function TaskDetailPage() {
 
   if (error || !task) {
     return (
-      <div className="p-4 bg-red-50 text-red-600 rounded-lg">
+      <div className="error-banner">
         Error loading task: {error?.message || "Task not found"}
       </div>
     )
@@ -36,50 +36,50 @@ export function TaskDetailPage() {
           <h1 className="text-2xl font-bold">{task.title}</h1>
           <TaskStatusBadge status={task.status} />
         </div>
-        <TaskActionBar taskId={task.id} status={task.status} />
+        <TaskActionBar task={task} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <div className="border rounded-lg p-4">
+          <div className="card p-4">
             <h2 className="font-semibold mb-2">Description</h2>
-            <p className="text-gray-700 whitespace-pre-wrap">{task.description}</p>
+            <p className="text-muted whitespace-pre-wrap">{task.description}</p>
           </div>
 
           <DiffReviewPanel taskId={task.id} status={task.status} />
 
-          <div className="border rounded-lg p-4">
+          <div className="card p-4">
             <h2 className="font-semibold mb-4">Event Timeline</h2>
             <TaskTimelinePanel taskId={task.id} taskStatus={task.status} />
           </div>
         </div>
 
         <div className="space-y-4">
-          <div className="border rounded-lg p-4">
+          <div className="card p-4">
             <h2 className="font-semibold mb-3">Details</h2>
             <dl className="space-y-2">
               <div>
-                <dt className="text-sm text-gray-500">Coding Persona</dt>
+                <dt className="text-sm text-muted">Coding Persona</dt>
                 <dd className="font-medium">{task.codingPersonaName}</dd>
               </div>
               {task.planningPersonaName && (
                 <div>
-                  <dt className="text-sm text-gray-500">Planning Persona</dt>
+                  <dt className="text-sm text-muted">Planning Persona</dt>
                   <dd className="font-medium">{task.planningPersonaName}</dd>
                 </div>
               )}
               <div>
-                <dt className="text-sm text-gray-500">Priority</dt>
+                <dt className="text-sm text-muted">Priority</dt>
                 <dd>
                   <Badge color="gray">P{task.priority}</Badge>
                 </dd>
               </div>
               <div>
-                <dt className="text-sm text-gray-500">Repository</dt>
-                <dd className="font-mono text-sm">{task.repoPath}</dd>
+                <dt className="text-sm text-muted">Repository</dt>
+                <dd className="code-inline">{task.repoPath}</dd>
               </div>
               <div>
-                <dt className="text-sm text-gray-500">Target Files</dt>
+                <dt className="text-sm text-muted">Target Files</dt>
                 <dd className="flex flex-wrap gap-1">
                   {task.targetFiles.map((file) => (
                     <Badge key={file} color="purple">{file}</Badge>
@@ -88,47 +88,47 @@ export function TaskDetailPage() {
               </div>
               {task.sessionId && (
                 <div>
-                  <dt className="text-sm text-gray-500">Session ID</dt>
-                  <dd className="font-mono text-sm">{task.sessionId}</dd>
+                  <dt className="text-sm text-muted">Session ID</dt>
+                  <dd className="code-inline">{task.sessionId}</dd>
                 </div>
               )}
               {task.errorMessage && (
                 <div>
-                  <dt className="text-sm text-gray-500">Error</dt>
-                  <dd className="text-red-600">{task.errorMessage}</dd>
+                  <dt className="text-sm text-muted">Error</dt>
+                  <dd className="text-danger">{task.errorMessage}</dd>
                 </div>
               )}
               {task.reviewedBy && (
                 <div>
-                  <dt className="text-sm text-gray-500">Reviewed By</dt>
+                  <dt className="text-sm text-muted">Reviewed By</dt>
                   <dd>{task.reviewedBy}</dd>
                 </div>
               )}
               {task.reviewNote && (
                 <div>
-                  <dt className="text-sm text-gray-500">Review Note</dt>
+                  <dt className="text-sm text-muted">Review Note</dt>
                   <dd>{task.reviewNote}</dd>
                 </div>
               )}
             </dl>
           </div>
 
-          <div className="border rounded-lg p-4">
+          <div className="card p-4">
             <h2 className="font-semibold mb-3">Timestamps</h2>
             <dl className="space-y-2 text-sm">
               <div>
-                <dt className="text-gray-500">Created</dt>
+                <dt className="text-muted">Created</dt>
                 <dd>{new Date(task.createdAt).toLocaleString()}</dd>
               </div>
               {task.startedAt && (
                 <div>
-                  <dt className="text-gray-500">Started</dt>
+                  <dt className="text-muted">Started</dt>
                   <dd>{new Date(task.startedAt).toLocaleString()}</dd>
                 </div>
               )}
               {task.completedAt && (
                 <div>
-                  <dt className="text-gray-500">Completed</dt>
+                  <dt className="text-muted">Completed</dt>
                   <dd>{new Date(task.completedAt).toLocaleString()}</dd>
                 </div>
               )}

@@ -10,6 +10,7 @@ import { TaskStatus } from "../db/schema"
 export const tasksRouter = new Hono()
 
 const taskSchema = z.object({
+  identifier: z.string().optional(),
   title: z.string().min(1),
   description: z.string().min(1),
   codingPersonaId: z.string().min(1),

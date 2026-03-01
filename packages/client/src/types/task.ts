@@ -16,6 +16,7 @@ export type TaskStatusType = typeof TaskStatus[keyof typeof TaskStatus]
 
 export interface Task {
   id: string
+  identifier: string | null
   title: string
   description: string
   codingPersonaId: string
@@ -42,6 +43,7 @@ export interface Task {
 }
 
 export interface TaskInput {
+  identifier?: string
   title: string
   description: string
   codingPersonaId: string

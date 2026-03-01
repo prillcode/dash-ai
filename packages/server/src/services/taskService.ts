@@ -12,6 +12,7 @@ type Task = typeof tasks.$inferSelect
 type NewTask = typeof tasks.$inferInsert
 
 export interface TaskInput {
+  identifier?: string
   title: string
   description: string
   codingPersonaId: string
@@ -84,6 +85,7 @@ export async function createTask(input: TaskInput): Promise<Task> {
   
   const [row] = await db.insert(tasks).values({
     id,
+    identifier: input.identifier ?? null,
     title: input.title,
     description: input.description,
     codingPersonaId: input.codingPersonaId,
