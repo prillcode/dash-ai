@@ -117,6 +117,24 @@
 
 ---
 
+### Phase 07: Config Menu & Models Setup
+**Status:** 📋 Planned
+
+**Goals:**
+- Add "Config" menu option to sidebar with "Setup Models" page
+- Replace models.json file with database table for model configurations
+- Allow users to define AI models (provider, model ID, API key storage optional)
+- Integrate with existing persona system for model selection
+- Provide UI to test model connectivity
+
+**Plans:**
+- `07-01` 📋 — Database: create models table, migration, service
+- `07-02` 📋 — Server: routes for CRUD, model validation, test endpoint
+- `07-03` 📋 — Client: Config menu, Models page, form components
+- `07-04` 📋 — Integration: update persona creation to use models table, migrate existing models.json
+
+---
+
 ## Next Steps
 
 1. Review and refine this ROADMAP.md
