@@ -1,7 +1,7 @@
 import { homedir } from "os"
 import { join } from "path"
 import { existsSync } from "fs"
-import type { Config, createOpencode } from "@opencode-ai/sdk"
+import { createOpencode } from "@opencode-ai/sdk"
 
 export function checkSkillsInstalled(): { ok: boolean; missing: string[] } {
   const required = ["start-work", "create-plans"]
@@ -11,11 +11,12 @@ export function checkSkillsInstalled(): { ok: boolean; missing: string[] } {
   return { ok: missing.length === 0, missing }
 }
 
-export function normalizeModel(model: string, provider?: string): string {
-  if (model.includes('/')) {
-    return model
+export function normalizeModel(model: string, provider?: string): { providerID: string; modelID: string } {
+  if (model.includes("/")) {
+    const slash = model.indexOf("/")
+    return { providerID: model.slice(0, slash), modelID: model.slice(slash + 1) }
   }
-  return `${provider || 'anthropic'}/${model}`
+  return { providerID: provider || "anthropic", modelID: model }
 }
 
 export interface PlanningRunnerInput {
@@ -46,45 +47,23 @@ export async function runPlanningSession(
 ): Promise<PlanningResult> {
   try {
     await onEvent("PLANNING_EVENT", { status: "starting", message: "Initializing OpenCode SDK" })
-
-    let createOpencodeServer: any
-    try {
-      const sdk = await import("@opencode-ai/sdk")
-      createOpencodeServer = sdk.createOpencode
-    } catch (importError: any) {
-      if (importError.code === 'MODULE_NOT_FOUND') {
-        await onEvent("ERROR", {
-          message: "OpenCode SDK not found — install @opencode-ai/sdk",
-          stack: "Planning session runner is a placeholder. To enable real planning, install OpenCode SDK and ensure start-work and create-plans skills are available."
-        })
-        return {
-          success: false,
-          planDocPath: join(input.repoPath, ".planning", input.planPath || ""),
-          errorMessage: "OpenCode SDK not found — install @opencode-ai/sdk"
-        }
-      }
-      throw importError
-    }
-
     await onEvent("PLANNING_EVENT", { status: "creating_session", message: "Creating planning session" })
 
-    const { client } = await createOpencodeServer({
-      config: {}
-    })
+    const { client } = await createOpencode({ config: {} })
 
-    const session = await client.session.create({
+    const createResult = await client.session.create({
       query: { directory: input.repoPath },
-      body: { title: `Plan: ${input.taskTitle}` }
+      body: { title: `Plan: ${input.taskTitle}` },
     })
 
-    if (!session || !session.id) {
-      throw new Error("Failed to create session")
+    if (createResult.error || !createResult.data?.id) {
+      throw new Error(`Failed to create planning session: ${JSON.stringify(createResult.error)}`)
     }
 
-    const sessionId = session.id
+    const sessionId = createResult.data.id
     await onEvent("PLANNING_EVENT", { status: "session_created", sessionId })
 
-    const normalizedModel = normalizeModel(input.planningPersona.model, input.planningPersona.provider)
+    const model = normalizeModel(input.planningPersona.model, input.planningPersona.provider)
 
     await onEvent("PLANNING_EVENT", { status: "sending_prompt", message: "Sending planning prompt" })
 
@@ -92,68 +71,76 @@ export async function runPlanningSession(
       path: { id: sessionId },
       query: { directory: input.repoPath },
       body: {
-         model: normalizedModel,
-         agent: "plan",
-         system: input.planningPersona.systemPrompt,
-         parts: [
-           {
-             type: "text" as const,
-             text: input.taskDescription
-           }
-        ]
-      }
+        model,
+        agent: "plan",
+        system: input.planningPersona.systemPrompt,
+        parts: [
+          {
+            type: "text" as const,
+            text: input.taskDescription,
+          },
+        ],
+      },
     })
 
-    if (!promptResult.info) {
-      throw new Error("Prompt failed")
+    if (promptResult.error) {
+      throw new Error(`Prompt submission failed: ${JSON.stringify(promptResult.error)}`)
     }
 
-    await onEvent("PLANNING_EVENT", { status: "prompt_sent", message: "Planning prompt sent" })
+    await onEvent("PLANNING_EVENT", { status: "prompt_sent", message: "Planning prompt sent, waiting for completion" })
 
+    // Subscribe to the global event stream and filter for this session.
+    // The SSE result exposes a .stream AsyncGenerator — iterate that, not the result itself.
+    // Completion:  EventSessionIdle   { type: "session.idle",   properties: { sessionID } }
+    //              EventSessionStatus { type: "session.status", properties: { sessionID, status: { type: "idle" } } }
+    // Error:       EventSessionError  { type: "session.error",  properties: { sessionID, error } }
     let completed = false
-    let attempts = 0
-    const maxAttempts = 300
-    const pollInterval = 1000
+    let sessionError: string | undefined
 
     try {
-      for await (const event of client.session.events({
-        path: { id: sessionId },
-        signal: AbortSignal.timeout(300000)
-      })) {
-        const eventType = event.event
-
-        if (eventType === "session_completed" || eventType === "session_stopped") {
-          completed = true
-          await onEvent("PLANNING_EVENT", { status: "session_finished", eventType, timestamp: event.timestamp })
-          await onEvent("PLANNING_EVENT", { status: "session_finished", message: "Planning session finished" })
-          break
-        } else if (eventType === "error") {
-          const errorMsg = typeof event.data === 'string' ? event.data : JSON.stringify(event.data)
-          await onEvent("PLANNING_EVENT", { status: "error", error: errorMsg })
-          throw new Error(`Planning session error: ${errorMsg}`)
-        } else {
-          await onEvent("PLANNING_EVENT", {
-            status: eventType,
-            ...event.data,
-            timestamp: event.timestamp
-          })
-        }
-
-        attempts++
-        if (!completed && attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, pollInterval))
-        }
-      }
-
-      if (!completed) {
-        throw new Error("Session did not complete within timeout period")
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      await onEvent("ERROR", {
-        message: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined
+      const eventResult = await client.event.subscribe({
+        query: { directory: input.repoPath },
       })
+
+      for await (const raw of eventResult.stream) {
+        const evt = raw as { type: string; properties?: Record<string, any> }
+        const props = evt.properties || {}
+
+        // Filter to our session only
+        if (props.sessionID && props.sessionID !== sessionId) continue
+
+        await onEvent("PLANNING_EVENT", { status: evt.type, ...props })
+
+        if (evt.type === "session.idle") {
+          completed = true
+          break
+        }
+
+        if (evt.type === "session.status" && props.status?.type === "idle") {
+          completed = true
+          break
+        }
+
+        if (evt.type === "session.error") {
+          const err = props.error
+          sessionError = err?.data?.message || err?.name || JSON.stringify(err) || "Unknown session error"
+          break
+        }
+      }
+    } catch (streamError) {
+      const msg = streamError instanceof Error ? streamError.message : String(streamError)
+      if (msg.includes("timeout") || msg.includes("aborted")) {
+        throw new Error("Planning session timed out waiting for completion")
+      }
+      throw streamError
+    }
+
+    if (sessionError) {
+      throw new Error(`Planning session error: ${sessionError}`)
+    }
+
+    if (!completed) {
+      throw new Error("Planning session ended without completion signal")
     }
 
     await onEvent("PLANNING_EVENT", { status: "completed", message: "Planning session finished" })
@@ -166,13 +153,13 @@ export async function runPlanningSession(
     const errorMessage = error instanceof Error ? error.message : String(error)
     await onEvent("ERROR", {
       message: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
     })
 
     return {
       success: false,
       planDocPath: join(input.repoPath, ".planning", input.planPath || ""),
-      errorMessage
+      errorMessage,
     }
   }
 }

@@ -1,9 +1,4 @@
 import * as eventService from "../services/eventService"
-import * as taskService from "../services/taskService"
-import { TaskStatus } from "../db/schema"
-import { now } from "../utils/time"
-import fs from "fs/promises"
-import path from "path"
 import { runCodingSession } from "./codingRunner"
 import type { EventType } from "../services/eventService"
 
@@ -36,16 +31,10 @@ interface SessionResult {
 export class SessionRunner {
   private task: Task
   private persona: Persona
-  private workingDir: string
-  private diffDir: string
-  private logDir: string
 
   constructor(task: Task, persona: Persona) {
     this.task = task
     this.persona = persona
-    this.workingDir = process.env.OPENCODE_WORKING_DIR || "/tmp/opencode-workspaces"
-    this.diffDir = process.env.DIFF_STORAGE_DIR || "/tmp/dash-ai/diffs"
-    this.logDir = process.env.LOG_STORAGE_DIR || "/tmp/dash-ai/sessions"
   }
 
   async run(): Promise<SessionResult> {
