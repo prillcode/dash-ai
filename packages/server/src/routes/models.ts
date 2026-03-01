@@ -10,11 +10,12 @@ const DEFAULT_MODELS = {
     {
       id: "anthropic",
       name: "Anthropic",
-      models: [
-        { id: "claude-opus-4-5", name: "Claude Opus 4.5", note: "best for planning" },
-        { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", note: "best for coding" },
-        { id: "claude-haiku-3-5", name: "Claude Haiku 3.5", note: "fast + cheap" },
-      ],
+       models: [
+         { id: "claude-opus-4-5", name: "Claude Opus 4.5", note: "best for planning" },
+         { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", note: "best for coding" },
+         { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", note: "latest Sonnet model" },
+         { id: "claude-haiku-3-5", name: "Claude Haiku 3.5", note: "fast + cheap" },
+       ],
     },
     {
       id: "openai",
@@ -22,6 +23,21 @@ const DEFAULT_MODELS = {
       models: [
         { id: "o3", name: "o3", note: "best for planning" },
         { id: "gpt-4o", name: "GPT-4o", note: "fast + capable" },
+      ],
+    },
+    {
+      id: "deepseek",
+      name: "DeepSeek",
+      models: [
+        { id: "deepseek-reasoner", name: "DeepSeek Reasoner", note: "strong reasoning model" },
+        { id: "deepseek-chat", name: "DeepSeek Chat", note: "general coding model" },
+      ],
+    },
+    {
+      id: "zai",
+      name: "Z.AI",
+      models: [
+        { id: "glm-4.7", name: "GLM 4.7", note: "Coding Plan model" },
       ],
     },
     {

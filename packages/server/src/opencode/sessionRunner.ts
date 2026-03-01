@@ -4,6 +4,8 @@ import { TaskStatus } from "../db/schema"
 import { now } from "../utils/time"
 import fs from "fs/promises"
 import path from "path"
+import { runCodingSession } from "./codingRunner"
+import type { EventType } from "../services/eventService"
 
 interface Persona {
   id: string
@@ -12,6 +14,7 @@ interface Persona {
   model: string
   allowedTools: string[]
   contextFiles: string[]
+  provider?: string
 }
 
 interface Task {
@@ -19,6 +22,7 @@ interface Task {
   title: string
   description: string
   repoPath: string
+  planPath?: string | null
 }
 
 interface SessionResult {
@@ -48,42 +52,7 @@ export class SessionRunner {
     const logEntries: string[] = []
 
     try {
-      logEntries.push(`[${now()}] Starting session for task: ${this.task.title}`)
-      logEntries.push(`[${now()}] Using persona: ${this.persona.name}`)
-      logEntries.push(`[${now()}] Model: ${this.persona.model}`)
-
-      // TODO: Implement actual OpenCode SDK integration
-      // This is a placeholder that will need to be updated based on the actual SDK API
-      // The implementation should:
-      // 1. Create an OpenCode session with the persona's model
-      // 2. Inject the system prompt and context files
-      // 3. Send the task description
-      // 4. Subscribe to events and forward them to eventService
-      // 5. Capture the diff and save it
-      // 6. Save the session log
-
-      // Placeholder: Simulate some events
-      await eventService.appendEvent(taskId, "STATUS_CHANGE", {
-        from: "RUNNING",
-        to: "RUNNING",
-      })
-
-      // Create diff directory
-      await fs.mkdir(path.join(this.diffDir, taskId), { recursive: true })
-      const diffPath = path.join(this.diffDir, taskId, "changes.diff")
-      
-      // Placeholder diff content
-      const diffContent = `# Diff for task: ${this.task.title}\n# TODO: Replace with actual diff from OpenCode SDK\n`
-      await fs.writeFile(diffPath, diffContent)
-      logEntries.push(`[${now()}] Wrote diff to ${diffPath}`)
-
-      // Create log directory and save session log
-      await fs.mkdir(path.join(this.logDir, taskId), { recursive: true })
-      const logPath = path.join(this.logDir, taskId, "session.log")
-      await fs.writeFile(logPath, logEntries.join("\n"))
-      logEntries.push(`[${now()}] Wrote log to ${logPath}`)
-
-      return { diffPath, logPath, sessionId }
+      return await runSession(this.task, this.persona)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       logEntries.push(`[${now()}] ERROR: ${errorMessage}`)
@@ -101,6 +70,34 @@ export async function runSession(
   task: Task,
   persona: Persona
 ): Promise<SessionResult> {
-  const runner = new SessionRunner(task, persona)
-  return runner.run()
+  const result = await runCodingSession(
+    {
+      taskId: task.id,
+      taskTitle: task.title,
+      taskDescription: task.description,
+      repoPath: task.repoPath,
+      planPath: task.planPath || "",
+      codingPersona: {
+        id: persona.id,
+        name: persona.name,
+        model: persona.model,
+        systemPrompt: persona.systemPrompt,
+        allowedTools: persona.allowedTools,
+        provider: persona.provider,
+      },
+    },
+    async (type, payload) => {
+      await eventService.appendEvent(task.id, type as EventType, payload as any)
+    }
+  )
+
+  if (!result.success) {
+    throw new Error(result.errorMessage || "Coding session failed")
+  }
+
+  return {
+    diffPath: result.diffPath || "",
+    logPath: result.logPath || "",
+    sessionId: result.sessionId,
+  }
 }
