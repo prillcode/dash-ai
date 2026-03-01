@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/assets/dash-ai-logo.png" alt="Dash AI" width="320" />
+  <img src="packages/client/public/assets/agent-dash-logo.png" alt="Dash AI" width="320" />
 </p>
 
 A self-hosted, planning-first AI kanban board for managing coding tasks across local repos. Submit a task, let an AI planner generate a spec, review and iterate on it, then approve it for coding — all from the dashboard.
