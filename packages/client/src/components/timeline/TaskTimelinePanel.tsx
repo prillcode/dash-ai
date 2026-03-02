@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import React, { useEffect, useRef } from "react"
 import { useTaskEventStream } from "../../api/events"
 import { TaskStatus } from "../../types/task"
 import type { TaskEvent, TaskStatusType } from "../../types/task"
@@ -13,7 +13,7 @@ function formatEventTime(timestamp: string): string {
   return new Date(timestamp).toLocaleTimeString()
 }
 
-function renderEventContent(event: TaskEvent) {
+function renderEventContent(event: TaskEvent): React.ReactNode {
   switch (event.eventType) {
     case "STATUS_CHANGE": {
       const payload = event.payload as { from: string; to: string }
@@ -79,27 +79,88 @@ function renderEventContent(event: TaskEvent) {
       const status = payload.status as string | undefined
       const message = payload.message as string | undefined
       const sessionId = payload.sessionId as string | undefined
-      const eventType = payload.eventType as string | undefined
 
-      // Render heartbeats in a subdued style to reduce noise
+      const label = event.eventType === "PLANNING_EVENT" ? "Planning" : "Coding"
+
+      // Suppress pure noise
       if (status === "server.heartbeat") {
         return (
           <div className="text-xs text-subtle italic">
-            {event.eventType === "PLANNING_EVENT" ? "planning" : "coding"} · heartbeat
+            {label.toLowerCase()} · heartbeat
+          </div>
+        )
+      }
+      if (status === "message.part.delta") return null
+
+      // Agent text output — show the actual text the model wrote
+      if (status === "agent.text") {
+        const text = payload.text as string
+        return (
+          <div className="text-sm text-text whitespace-pre-wrap font-mono bg-surface-1 rounded px-2 py-1 border-l-2 border-accent">
+            {text.length > 600 ? text.slice(-600) + "…" : text}
           </div>
         )
       }
 
-      const label = event.eventType === "PLANNING_EVENT" ? "Planning" : "Coding"
-      const detail = message ?? eventType ?? status ?? ""
+      // Agent reasoning
+      if (status === "agent.reasoning") {
+        const text = payload.text as string
+        return (
+          <div className="text-xs text-subtle italic whitespace-pre-wrap">
+            <span className="font-medium not-italic">Thinking:</span>{" "}
+            {text.length > 300 ? text.slice(0, 300) + "…" : text}
+          </div>
+        )
+      }
 
+      // Tool call running / complete
+      if (status === "tool.running" || status === "tool.complete") {
+        const tool = payload.tool as string
+        const toolState = payload.toolState as string | undefined
+        const isComplete = status === "tool.complete"
+        return (
+          <div className="text-sm flex items-center gap-2">
+            <span className={isComplete ? "text-success" : "text-yellow-400"}>
+              {isComplete ? "✓" : "⟳"}
+            </span>
+            <span className="text-purple font-mono">{tool}</span>
+            {toolState && (
+              <span className="text-xs text-subtle">{toolState}</span>
+            )}
+          </div>
+        )
+      }
+
+      // Milestone status messages (starting, provider_ready, prompt_sent, etc.)
+      const milestoneMessages: Record<string, string> = {
+        starting: "Initializing...",
+        creating_session: "Creating session...",
+        session_created: "Session created",
+        provider_ready: message ?? "Provider ready",
+        sending_prompt: "Sending prompt...",
+        prompt_sent: "Prompt sent, waiting for model...",
+        "question.answered": "Answered interactive question",
+        "session.idle": "Session complete",
+        completed: "Done",
+      }
+
+      if (status && milestoneMessages[status]) {
+        return (
+          <div className="text-sm">
+            <span className="text-accent font-medium">{label}:</span>{" "}
+            <span className="text-text">{milestoneMessages[status]}</span>
+            {sessionId && (
+              <span className="ml-2 text-xs text-subtle">session {String(sessionId).slice(0, 12)}…</span>
+            )}
+          </div>
+        )
+      }
+
+      // Fallback for any other event types
+      const detail = message ?? status ?? ""
       return (
-        <div className="text-sm">
-          <span className="text-accent font-medium">{label}:</span>{" "}
-          <span className="text-text">{detail || status}</span>
-          {sessionId && (
-            <span className="ml-2 text-xs text-subtle">session {sessionId.slice(0, 12)}…</span>
-          )}
+        <div className="text-sm text-muted">
+          <span className="font-medium">{label}:</span> {detail}
         </div>
       )
     }
@@ -142,14 +203,18 @@ export function TaskTimelinePanel({ taskId, taskStatus }: TaskTimelinePanelProps
       ref={containerRef}
       className="scroll-panel"
     >
-      {events.map((event) => (
-        <div key={event.id} className="flex items-start gap-3">
-          <span className="text-xs text-subtle whitespace-nowrap">
-            {formatEventTime(event.createdAt)}
-          </span>
-          <div className="flex-1">{renderEventContent(event)}</div>
-        </div>
-      ))}
+      {events.map((event) => {
+        const content = renderEventContent(event)
+        if (content === null) return null
+        return (
+          <div key={event.id} className="flex items-start gap-3">
+            <span className="text-xs text-subtle whitespace-nowrap">
+              {formatEventTime(event.createdAt)}
+            </span>
+            <div className="flex-1">{content}</div>
+          </div>
+        )
+      })}
     </div>
   )
 }

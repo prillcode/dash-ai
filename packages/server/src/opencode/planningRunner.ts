@@ -255,6 +255,44 @@ export async function runPlanningSession(
           // Filter to our session only (heartbeats etc have no sessionID — let them through for UI)
           if (props.sessionID && props.sessionID !== sessionId) continue
 
+          // For message.part.updated events, extract human-readable content from the part
+          // so the UI can show actual agent text/tool activity rather than raw event names.
+          if (evt.type === "message.part.updated") {
+            const part = props.part as any
+            if (part?.type === "text" && part.text) {
+              // Emit the latest full text of the message part (not just the delta)
+              await onEvent("PLANNING_EVENT", {
+                status: "agent.text",
+                text: part.text,
+                partId: part.id,
+                messageId: part.messageID,
+              })
+            } else if (part?.type === "reasoning" && part.text) {
+              await onEvent("PLANNING_EVENT", {
+                status: "agent.reasoning",
+                text: part.text,
+                partId: part.id,
+              })
+            } else if (part?.type === "tool") {
+              const state = part.state as any
+              const toolName = part.tool as string
+              const isComplete = state?.status === "completed" || state?.status === "error"
+              await onEvent("PLANNING_EVENT", {
+                status: isComplete ? "tool.complete" : "tool.running",
+                tool: toolName,
+                toolState: state?.status,
+                partId: part.id,
+              })
+            } else {
+              // Other part types — emit raw
+              await onEvent("PLANNING_EVENT", { status: evt.type, ...props })
+            }
+            continue
+          }
+
+          // For message.part.delta events, skip — message.part.updated covers the full text
+          if (evt.type === "message.part.delta") continue
+
           await onEvent("PLANNING_EVENT", { status: evt.type, ...props })
 
           // Auto-answer questions inline from the stream as well

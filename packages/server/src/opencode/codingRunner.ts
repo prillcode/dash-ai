@@ -184,6 +184,28 @@ export async function runCodingSession(
         // Filter to our session only
         if (props.sessionID && props.sessionID !== sessionId) continue
 
+        // For message.part.updated events, extract human-readable content from the part
+        if (evt.type === "message.part.updated") {
+          const part = props.part as any
+          if (part?.type === "text" && part.text) {
+            await onEvent("CODING_EVENT", { status: "agent.text", text: part.text, partId: part.id })
+          } else if (part?.type === "reasoning" && part.text) {
+            await onEvent("CODING_EVENT", { status: "agent.reasoning", text: part.text, partId: part.id })
+          } else if (part?.type === "tool") {
+            const state = part.state as any
+            const isComplete = state?.status === "completed" || state?.status === "error"
+            await onEvent("CODING_EVENT", {
+              status: isComplete ? "tool.complete" : "tool.running",
+              tool: part.tool,
+              toolState: state?.status,
+              partId: part.id,
+            })
+          }
+          continue
+        }
+        // Skip deltas — part.updated carries the full text
+        if (evt.type === "message.part.delta") continue
+
         await logEvent(logPath, "CODING_EVENT", { eventType: evt.type, ...props })
         await onEvent("CODING_EVENT", { status: evt.type, ...props })
 
