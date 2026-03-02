@@ -304,8 +304,12 @@ export async function runPlanningSession(
       }
     }
 
-    const [pollResult] = await Promise.all([pollForCompletion(), streamLoop()])
-    abortController.abort() // ensure stream loop exits if poll won
+    // Race: whichever resolves first (poll detecting finish, or stream idle event) wins.
+    // We do NOT await streamLoop here — it blocks forever on the open SSE connection.
+    // Instead, poll drives completion; streamLoop runs fire-and-forget for live events.
+    streamLoop() // fire and forget — events flow to UI but don't block completion
+    const pollResult = await pollForCompletion()
+    abortController.abort() // signal stream loop to stop on next iteration
 
     if (!completed) {
       if (pollResult === "timeout") {
