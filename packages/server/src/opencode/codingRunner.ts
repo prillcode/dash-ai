@@ -1,33 +1,11 @@
-import { homedir } from "os"
+import { homedir, tmpdir } from "os"
 import { join } from "path"
 import { mkdir, appendFile } from "fs/promises"
-import { exec } from "child_process"
+import { writeFileSync, mkdirSync } from "fs"
+import { exec, spawn } from "child_process"
 import { promisify } from "util"
-import { createOpencode } from "@opencode-ai/sdk"
 import { normalizeModel } from "./planningRunner"
-import { checkProviderAuth, loadProviderConfig } from "./authCheck"
-
-/**
- * Poll GET /config/providers until the required providerID appears.
- * Mirrors the same helper in planningRunner — providers initialise asynchronously
- * and a prompt sent too early will be silently dropped.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function waitForProvider(
-  client: any,
-  providerID: string,
-  directory: string,
-  timeoutMs = 10_000
-): Promise<void> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    const result = await client.config.providers({ query: { directory } })
-    const providers: Array<{ id?: string }> = (result.data as any)?.providers ?? []
-    if (providers.some((p) => p.id === providerID)) return
-    await new Promise((r) => setTimeout(r, 200))
-  }
-  throw new Error(`Provider "${providerID}" not ready after ${timeoutMs}ms`)
-}
+import { checkProviderAuth } from "./authCheck"
 
 const execAsync = promisify(exec)
 
@@ -55,23 +33,6 @@ export interface CodingResult {
   errorMessage?: string
 }
 
-function detectAuthError(errorText: string): boolean {
-  const patterns = [
-    /authentication/i,
-    /401/i,
-    /403/i,
-    /invalid_api_key/i,
-    /ANTHROPIC_API_KEY/i,
-    /DEEPSEEK_API_KEY/i,
-    /OPENAI_API_KEY/i,
-    /API_KEY/i,
-    /unauthorized/i,
-    /permission denied/i,
-    /ProviderAuthError/i,
-  ]
-  return patterns.some((pattern) => pattern.test(errorText))
-}
-
 async function logEvent(
   logPath: string,
   type: string,
@@ -82,6 +43,17 @@ async function logEvent(
   await appendFile(logPath, logLine)
 }
 
+/**
+ * Run a coding session by launching the opencode TUI in the user's terminal.
+ * The user monitors progress directly in opencode. Dash AI waits for the process
+ * to exit and then captures a git diff as the session artifact.
+ *
+ * Flow:
+ *   1. Pre-flight auth check
+ *   2. Spawn `opencode run <prompt>` in the repo directory (TUI renders for user)
+ *   3. Wait for process exit as the completion signal
+ *   4. Capture git diff HEAD as the session artifact
+ */
 export async function runCodingSession(
   input: CodingRunnerInput,
   onEvent: (type: string, payload: Record<string, unknown>) => Promise<void>
@@ -92,207 +64,124 @@ export async function runCodingSession(
   const logPath = join(sessionDir, "session.log")
   const diffPath = join(diffDir, "changes.diff")
 
-  // Hoisted so the finally block can always kill the spawned opencode serve process.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let server: any = null
   try {
     await mkdir(sessionDir, { recursive: true })
     await mkdir(diffDir, { recursive: true })
 
-    // Pre-flight: verify provider credentials before spawning an OpenCode server.
-    // Without this, an expired/missing token causes a silent hang with no error event.
+    await onEvent("CODING_EVENT", { status: "starting", message: "Starting coding session" })
+    await logEvent(logPath, "CODING_EVENT", { status: "starting" })
+
+    // Pre-flight: verify provider credentials before launching opencode.
     const authCheck = await checkProviderAuth(input.codingPersona.provider || input.codingPersona.model)
     if (!authCheck.ok) {
       throw new Error(authCheck.errorMessage!)
     }
 
-    // Inject API keys from auth.json / env vars into the spawned OpenCode server
-    // via OPENCODE_CONFIG_CONTENT so it can authenticate without reading auth.json itself.
-    const providerConfig = await loadProviderConfig()
-    const opencodeInstance = await createOpencode({ config: { provider: providerConfig } })
-    server = opencodeInstance.server
-    const client = opencodeInstance.client
+    const { providerID, modelID } = normalizeModel(input.codingPersona.model, input.codingPersona.provider)
 
-    await logEvent(logPath, "CODING_EVENT", { status: "creating_session" })
-    await onEvent("CODING_EVENT", { status: "creating_session", message: "Creating coding session" })
+    // Build the coding prompt — include the task description and any plan context
+    const prompt = [
+      `IMPORTANT: Do not ask for confirmation or clarification. Proceed immediately and completely.`,
+      ``,
+      `## Task`,
+      `Title: ${input.taskTitle}`,
+      ``,
+      input.taskDescription,
+    ].join("\n")
 
-    const createResult = await client.session.create({
-      query: { directory: input.repoPath },
-      body: { title: `Code: ${input.taskTitle}` },
+    await onEvent("CODING_EVENT", {
+      status: "launching",
+      message: "Launching OpenCode TUI — monitor progress in the terminal window",
+      model: `${providerID}/${modelID}`,
     })
+    await logEvent(logPath, "CODING_EVENT", { status: "launching", model: `${providerID}/${modelID}` })
 
-    if (createResult.error || !createResult.data?.id) {
-      throw new Error(`Failed to create session: ${JSON.stringify(createResult.error)}`)
-    }
+    // Launch opencode in a new gnome-terminal window so the user can watch progress.
+    // --wait blocks until the terminal window is closed, giving us a clean completion signal.
+    const tmpDir = join(tmpdir(), "dash-ai-coding")
+    mkdirSync(tmpDir, { recursive: true })
+    const scriptPath = join(tmpDir, `${input.taskId}.sh`)
+    writeFileSync(scriptPath, [
+      `#!/bin/bash`,
+      `cd ${JSON.stringify(input.repoPath)}`,
+      `opencode-cli run --model ${JSON.stringify(`${providerID}/${modelID}`)} ${JSON.stringify(prompt)}`,
+      `echo "OpenCode session finished (exit $?). Close this window to continue."`,
+      `read -p ""`,
+    ].join("\n"), { mode: 0o755 })
 
-    const sessionId = createResult.data.id
-    await logEvent(logPath, "CODING_EVENT", { status: "session_created", sessionId })
-    await onEvent("CODING_EVENT", { status: "session_created", sessionId })
+    const ocProcess = spawn(
+      "gnome-terminal",
+      ["--wait", "--", "bash", scriptPath],
+      {
+        cwd: input.repoPath,
+        stdio: "ignore",
+        detached: false,
+        env: { ...process.env },
+      }
+    )
 
-    // model must be { providerID, modelID } — normalizeModel returns this shape
-    const model = normalizeModel(input.codingPersona.model, input.codingPersona.provider)
+    // 20-minute timeout for a coding session
+    const SESSION_TIMEOUT_MS = 20 * 60 * 1000
+    const startTime = Date.now()
+    const deadline = startTime + SESSION_TIMEOUT_MS
 
-    // Wait for the provider to finish initialising before sending the prompt.
-    await waitForProvider(client, model.providerID, input.repoPath)
-    await logEvent(logPath, "CODING_EVENT", { status: "provider_ready", providerID: model.providerID })
-    await onEvent("CODING_EVENT", { status: "provider_ready", message: `Provider ${model.providerID} ready` })
+    const exitCode = await new Promise<number | null>((resolve, reject) => {
+      const heartbeatInterval = setInterval(async () => {
+        if (Date.now() > deadline) {
+          clearInterval(heartbeatInterval)
+          ocProcess.kill()
+          reject(new Error(`Coding session timed out after ${SESSION_TIMEOUT_MS / 60000} minutes`))
+          return
+        }
+        const elapsed = Math.round((Date.now() - startTime) / 1000)
+        await onEvent("CODING_EVENT", {
+          status: "running",
+          message: "OpenCode TUI is running — check your terminal for progress",
+          elapsed,
+        })
+        await logEvent(logPath, "CODING_EVENT", { status: "running", elapsed })
+      }, 10_000)
 
-    await logEvent(logPath, "CODING_EVENT", { status: "sending_prompt" })
-    await onEvent("CODING_EVENT", { status: "sending_prompt", message: "Sending coding prompt" })
-
-    const promptResult = await client.session.prompt({
-      path: { id: sessionId },
-      query: { directory: input.repoPath },
-      body: {
-        model,
-        agent: "build",
-        // noReply: true SUPPRESSES model execution entirely — do not set it.
-        system: input.codingPersona.systemPrompt,
-        tools: input.codingPersona.allowedTools.reduce(
-          (acc: Record<string, boolean>, tool: string) => ({ ...acc, [tool]: true }),
-          {}
-        ),
-        parts: [
-          {
-            type: "text" as const,
-            text: `IMPORTANT: Do not ask for confirmation or clarification. Proceed immediately and completely.\n\n${input.taskDescription}`,
-          },
-        ],
-      },
-    })
-
-    if (promptResult.error) {
-      throw new Error(`Prompt failed: ${JSON.stringify(promptResult.error)}`)
-    }
-
-    await logEvent(logPath, "CODING_EVENT", { status: "prompt_sent" })
-    await onEvent("CODING_EVENT", { status: "prompt_sent", message: "Coding prompt sent, waiting for completion" })
-
-    // Subscribe to global event stream and filter for our session.
-    // Completion: EventSessionIdle { type: "session.idle", properties: { sessionID } }
-    //             EventSessionStatus { type: "session.status", properties: { sessionID, status: { type: "idle" } } }
-    // Error:      EventSessionError  { type: "session.error", properties: { sessionID, error } }
-    let completed = false
-    let sessionError: string | undefined
-
-    try {
-      const eventResult = await client.event.subscribe({
-        query: { directory: input.repoPath },
+      ocProcess.on("exit", (code) => {
+        clearInterval(heartbeatInterval)
+        resolve(code)
       })
 
-      for await (const raw of eventResult.stream) {
-        const evt = raw as { type: string; properties?: Record<string, any> }
-        const props = evt.properties || {}
-
-        // Filter to our session only
-        if (props.sessionID && props.sessionID !== sessionId) continue
-
-        // For message.part.updated events, extract human-readable content from the part
-        if (evt.type === "message.part.updated") {
-          const part = props.part as any
-          if (part?.type === "text" && part.text) {
-            await onEvent("CODING_EVENT", { status: "agent.text", text: part.text, partId: part.id })
-          } else if (part?.type === "reasoning" && part.text) {
-            await onEvent("CODING_EVENT", { status: "agent.reasoning", text: part.text, partId: part.id })
-          } else if (part?.type === "tool") {
-            const state = part.state as any
-            const isComplete = state?.status === "completed" || state?.status === "error"
-            await onEvent("CODING_EVENT", {
-              status: isComplete ? "tool.complete" : "tool.running",
-              tool: part.tool,
-              toolState: state?.status,
-              partId: part.id,
-            })
-          }
-          continue
-        }
-        // Skip deltas — part.updated carries the full text
-        if (evt.type === "message.part.delta") continue
-
-        await logEvent(logPath, "CODING_EVENT", { eventType: evt.type, ...props })
-        await onEvent("CODING_EVENT", { status: evt.type, ...props })
-
-        if (evt.type === "session.idle") {
-          completed = true
-          break
-        }
-
-        if (evt.type === "session.status" && props.status?.type === "idle") {
-          completed = true
-          break
-        }
-
-        if (evt.type === "session.error") {
-          const err = props.error
-          sessionError =
-            err?.data?.message || err?.name || JSON.stringify(err) || "Unknown session error"
-          // Check for auth errors specifically
-          if (
-            err?.name === "ProviderAuthError" ||
-            detectAuthError(sessionError ?? "")
-          ) {
-            sessionError =
-              "Authentication failed. Use the OpenCode TUI to connect a provider, or set ANTHROPIC_API_KEY / DEEPSEEK_API_KEY in your environment."
-          }
-          break
-        }
-      }
-    } catch (streamError) {
-      const msg = streamError instanceof Error ? streamError.message : String(streamError)
-      if (msg.includes("timeout") || msg.includes("aborted")) {
-        throw new Error("Coding session timed out waiting for completion")
-      }
-      throw streamError
-    }
-
-    if (sessionError) {
-      throw new Error(sessionError)
-    }
-
-    if (!completed) {
-      throw new Error("Coding session ended without completion signal")
-    }
-
-    await logEvent(logPath, "CODING_EVENT", { status: "session_finished" })
-    await onEvent("CODING_EVENT", { status: "session_finished", message: "Coding session finished, capturing diff" })
-
-    // Capture diff — SDK returns Array<FileDiff> directly in .data
-    const diffResult = await client.session.diff({
-      path: { id: sessionId },
-      query: { directory: input.repoPath },
+      ocProcess.on("error", (err) => {
+        clearInterval(heartbeatInterval)
+        reject(err)
+      })
     })
 
-    const fileDiffs: Array<{ file: string; before: string; after: string }> =
-      diffResult.data || []
-
-    if (fileDiffs.length > 0) {
-      const diffText = fileDiffs
-        .map(
-          (fd) =>
-            `--- a/${fd.file}\n+++ b/${fd.file}\n${fd.before}\n${fd.after}`
-        )
-        .join("\n")
-      await appendFile(diffPath, diffText)
-      await logEvent(logPath, "CODING_EVENT", { status: "diff_captured", files: fileDiffs.length })
-    } else {
-      // Fallback: git diff HEAD
-      try {
-        const { stdout } = await execAsync("git diff HEAD", { cwd: input.repoPath })
-        if (stdout) {
-          await appendFile(diffPath, stdout)
-          await logEvent(logPath, "CODING_EVENT", { status: "diff_captured", source: "git" })
-        }
-      } catch {
-        await logEvent(logPath, "CODING_EVENT", { status: "diff_skipped", message: "No diff captured" })
-      }
+    // Exit code 0 = clean finish. 130 = Ctrl+C, 137 = SIGKILL (terminal window closed).
+    // Both mean the user dismissed the terminal after the session completed — treat as success.
+    const successCodes = new Set([0, 130, 137])
+    if (exitCode !== null && !successCodes.has(exitCode)) {
+      throw new Error(`opencode exited with code ${exitCode}`)
     }
 
-    await logEvent(logPath, "CODING_EVENT", { status: "completed" })
+    await onEvent("CODING_EVENT", { status: "session_finished", message: "Coding session finished, capturing diff" })
+    await logEvent(logPath, "CODING_EVENT", { status: "session_finished" })
+
+    // Capture git diff HEAD as the session artifact
+    try {
+      const { stdout } = await execAsync("git diff HEAD", { cwd: input.repoPath })
+      if (stdout) {
+        await appendFile(diffPath, stdout)
+        await logEvent(logPath, "CODING_EVENT", { status: "diff_captured", source: "git" })
+      } else {
+        await logEvent(logPath, "CODING_EVENT", { status: "diff_empty", message: "No changes detected" })
+      }
+    } catch {
+      await logEvent(logPath, "CODING_EVENT", { status: "diff_skipped", message: "git diff failed" })
+    }
+
     await onEvent("CODING_EVENT", { status: "completed", message: "Coding session complete" })
+    await logEvent(logPath, "CODING_EVENT", { status: "completed" })
 
     return {
       success: true,
-      sessionId,
+      sessionId: input.taskId,   // no opencode sessionId in this approach; use taskId
       diffPath,
       logPath,
     }
@@ -318,10 +207,5 @@ export async function runCodingSession(
       sessionId: "",
       errorMessage,
     }
-  } finally {
-    // Always kill the spawned `opencode serve` process when the session ends.
-    // Without this, the process lingers and holds port 4096, causing
-    // "Failed to start server on port 4096" errors on the next run.
-    try { server?.close() } catch { /* ignore */ }
   }
 }
