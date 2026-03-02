@@ -59,10 +59,14 @@ export function TaskDetailPage() {
 
           <DiffReviewPanel taskId={task.id} status={task.status} />
 
-          <div className="card p-4">
-            <h2 className="font-semibold mb-4">Event Timeline</h2>
-            <TaskTimelinePanel taskId={task.id} taskStatus={task.status} />
-          </div>
+          <details className="card" open>
+            <summary className="px-4 py-3 font-semibold cursor-pointer select-none bg-hover-subtle hover:bg-border rounded">
+              Event Timeline
+            </summary>
+            <div className="p-4">
+              <TaskTimelinePanel taskId={task.id} taskStatus={task.status} />
+            </div>
+          </details>
         </div>
 
         <div className="space-y-4">
