@@ -1,7 +1,6 @@
 import { homedir } from "os"
 import { join } from "path"
 import { readFile } from "fs/promises"
-import type { ProviderConfig as SDKProviderConfig } from "@opencode-ai/sdk"
 
 interface OAuthEntry {
   type: "oauth"
@@ -24,66 +23,6 @@ interface AuthJson {
 export interface AuthCheckResult {
   ok: boolean
   errorMessage?: string
-}
-
-export type ProviderMap = {
-  [providerID: string]: SDKProviderConfig
-}
-
-/**
- * Reads ~/.local/share/opencode/auth.json and builds a provider config object
- * suitable for passing as `OPENCODE_CONFIG_CONTENT` to the spawned OpenCode server.
- *
- * For API key entries, injects the key directly so the spawned process doesn't
- * need to read auth.json itself (which it may fail to do in some environments).
- *
- * Falls back to env vars (DEEPSEEK_API_KEY, ZAI_CODING_PLAN_API_KEY, etc.)
- * so .env values also work.
- */
-export async function loadProviderConfig(): Promise<ProviderMap> {
-  const config: ProviderMap = {}
-
-  // Map of provider ID → env var name (standard ones OpenCode already reads)
-  const envVarMap: Record<string, string> = {
-    anthropic: "ANTHROPIC_API_KEY",
-    openai: "OPENAI_API_KEY",
-    deepseek: "DEEPSEEK_API_KEY",
-    google: "GOOGLE_API_KEY",
-    mistral: "MISTRAL_API_KEY",
-    groq: "GROQ_API_KEY",
-    "zai-coding-plan": "ZAI_CODING_PLAN_API_KEY",
-  }
-
-  // 1. Inject from env vars first (these override auth.json if both present)
-  for (const [provider, envVar] of Object.entries(envVarMap)) {
-    const key = process.env[envVar]
-    if (key) {
-      config[provider] = { options: { apiKey: key } }
-    }
-  }
-
-  // 2. Load auth.json — inject API key entries that weren't already set by env var
-  const authPath = join(homedir(), ".local", "share", "opencode", "auth.json")
-  try {
-    const raw = await readFile(authPath, "utf-8")
-    const auth: AuthJson = JSON.parse(raw)
-
-    for (const [provider, entry] of Object.entries(auth)) {
-      // Skip if already set from env var
-      if (config[provider]) continue
-
-      if (entry.type === "api" && entry.key) {
-        config[provider] = { options: { apiKey: entry.key } }
-      }
-      // OAuth entries: leave for OpenCode to handle — it reads auth.json directly.
-      // We cannot safely inject an OAuth access token as an apiKey here because
-      // the Anthropic OAuth flow requires Bearer token auth, not x-api-key header.
-    }
-  } catch {
-    // auth.json not present — env vars are the only source, which is fine
-  }
-
-  return config
 }
 
 /**
