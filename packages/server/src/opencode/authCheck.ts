@@ -1,0 +1,180 @@
+import { homedir } from "os"
+import { join } from "path"
+import { readFile } from "fs/promises"
+import type { ProviderConfig as SDKProviderConfig } from "@opencode-ai/sdk"
+
+interface OAuthEntry {
+  type: "oauth"
+  access: string
+  refresh: string
+  expires: number
+}
+
+interface ApiEntry {
+  type: "api"
+  key: string
+}
+
+type AuthEntry = OAuthEntry | ApiEntry
+
+interface AuthJson {
+  [provider: string]: AuthEntry
+}
+
+export interface AuthCheckResult {
+  ok: boolean
+  errorMessage?: string
+}
+
+export type ProviderMap = {
+  [providerID: string]: SDKProviderConfig
+}
+
+/**
+ * Reads ~/.local/share/opencode/auth.json and builds a provider config object
+ * suitable for passing as `OPENCODE_CONFIG_CONTENT` to the spawned OpenCode server.
+ *
+ * For API key entries, injects the key directly so the spawned process doesn't
+ * need to read auth.json itself (which it may fail to do in some environments).
+ *
+ * Falls back to env vars (DEEPSEEK_API_KEY, ZAI_CODING_PLAN_API_KEY, etc.)
+ * so .env values also work.
+ */
+export async function loadProviderConfig(): Promise<ProviderMap> {
+  const config: ProviderMap = {}
+
+  // Map of provider ID → env var name (standard ones OpenCode already reads)
+  const envVarMap: Record<string, string> = {
+    anthropic: "ANTHROPIC_API_KEY",
+    openai: "OPENAI_API_KEY",
+    deepseek: "DEEPSEEK_API_KEY",
+    google: "GOOGLE_API_KEY",
+    mistral: "MISTRAL_API_KEY",
+    groq: "GROQ_API_KEY",
+    "zai-coding-plan": "ZAI_CODING_PLAN_API_KEY",
+  }
+
+  // 1. Inject from env vars first (these override auth.json if both present)
+  for (const [provider, envVar] of Object.entries(envVarMap)) {
+    const key = process.env[envVar]
+    if (key) {
+      config[provider] = { options: { apiKey: key } }
+    }
+  }
+
+  // 2. Load auth.json — inject API key entries that weren't already set by env var
+  const authPath = join(homedir(), ".local", "share", "opencode", "auth.json")
+  try {
+    const raw = await readFile(authPath, "utf-8")
+    const auth: AuthJson = JSON.parse(raw)
+
+    for (const [provider, entry] of Object.entries(auth)) {
+      // Skip if already set from env var
+      if (config[provider]) continue
+
+      if (entry.type === "api" && entry.key) {
+        config[provider] = { options: { apiKey: entry.key } }
+      }
+      // OAuth entries: leave for OpenCode to handle — it reads auth.json directly.
+      // We cannot safely inject an OAuth access token as an apiKey here because
+      // the Anthropic OAuth flow requires Bearer token auth, not x-api-key header.
+    }
+  } catch {
+    // auth.json not present — env vars are the only source, which is fine
+  }
+
+  return config
+}
+
+/**
+ * Reads ~/.local/share/opencode/auth.json and validates that the given
+ * provider has a valid credential:
+ *  - oauth: token must exist and not be expired (with 5-min buffer)
+ *  - api:   key must be a non-empty string
+ *
+ * Also accepts ANTHROPIC_API_KEY / DEEPSEEK_API_KEY env vars as fallback,
+ * since OpenCode reads those too.
+ */
+export async function checkProviderAuth(providerID: string): Promise<AuthCheckResult> {
+  // Normalise provider ID — strip model suffix if caller passed "anthropic/claude-..."
+  const provider = providerID.includes("/") ? providerID.split("/")[0] : providerID
+
+  // 1. Check env var fallback first (OpenCode reads these automatically)
+  const envVarMap: Record<string, string> = {
+    anthropic: "ANTHROPIC_API_KEY",
+    openai: "OPENAI_API_KEY",
+    deepseek: "DEEPSEEK_API_KEY",
+    google: "GOOGLE_API_KEY",
+    mistral: "MISTRAL_API_KEY",
+    groq: "GROQ_API_KEY",
+  }
+  const envVar = envVarMap[provider.toLowerCase()]
+  if (envVar && process.env[envVar]) {
+    return { ok: true }
+  }
+
+  // 2. Check ~/.local/share/opencode/auth.json
+  const authPath = join(homedir(), ".local", "share", "opencode", "auth.json")
+  let auth: AuthJson
+  try {
+    const raw = await readFile(authPath, "utf-8")
+    auth = JSON.parse(raw)
+  } catch {
+    return {
+      ok: false,
+      errorMessage:
+        `No credentials found for provider "${provider}". ` +
+        `Run the OpenCode TUI and use /connect to authenticate, ` +
+        `or set the ${envVar ?? `${provider.toUpperCase()}_API_KEY`} environment variable.`,
+    }
+  }
+
+  const entry = auth[provider] ?? auth[provider.toLowerCase()]
+  if (!entry) {
+    return {
+      ok: false,
+      errorMessage:
+        `Provider "${provider}" is not connected. ` +
+        `Open the OpenCode TUI, run /connect, and authenticate with ${provider}. ` +
+        `Or set the ${envVar ?? `${provider.toUpperCase()}_API_KEY`} environment variable.`,
+    }
+  }
+
+  if (entry.type === "api") {
+    if (!entry.key || entry.key.trim() === "") {
+      return {
+        ok: false,
+        errorMessage:
+          `API key for "${provider}" is empty. ` +
+          `Re-connect in the OpenCode TUI with /connect, or set ${envVar ?? `${provider.toUpperCase()}_API_KEY`}.`,
+      }
+    }
+    return { ok: true }
+  }
+
+  if (entry.type === "oauth") {
+    if (!entry.access) {
+      return {
+        ok: false,
+        errorMessage:
+          `OAuth token for "${provider}" is missing. ` +
+          `Re-connect in the OpenCode TUI with /connect.`,
+      }
+    }
+    // 5-minute buffer to avoid using a token that expires mid-session
+    const BUFFER_MS = 5 * 60 * 1000
+    if (Date.now() + BUFFER_MS > entry.expires) {
+      const expiredAt = new Date(entry.expires).toLocaleTimeString()
+      return {
+        ok: false,
+        errorMessage:
+          `OAuth token for "${provider}" has expired (expired at ${expiredAt}). ` +
+          `Open the OpenCode TUI and run /connect to refresh your session.`,
+      }
+    }
+    return { ok: true }
+  }
+
+  // Unknown entry type — pass through and let OpenCode handle it
+  return { ok: true }
+}

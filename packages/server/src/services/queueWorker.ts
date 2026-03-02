@@ -53,6 +53,8 @@ async function runPlanningTaskSession(task: {
   repoPath: string
   planPath: string | null
   planningPersonaId: string
+  identifier?: string | null
+  targetFiles?: string[]
 }) {
   const persona = await personaService.getPersona(task.planningPersonaId)
   if (!persona) {
@@ -68,6 +70,8 @@ async function runPlanningTaskSession(task: {
         taskId: task.id,
         taskTitle: task.title,
         taskDescription: task.description,
+        taskIdentifier: task.identifier ?? undefined,
+        targetFiles: task.targetFiles,
         repoPath: task.repoPath,
         planPath: task.planPath ?? undefined,
         planningPersona: {
@@ -115,13 +119,16 @@ export async function startQueueWorker() {
         if (planningTask && planningTask.planningPersonaId) {
           activeCount++
           console.log(`Claimed planning task ${planningTask.id}: ${planningTask.title}`)
-          await runPlanningTaskSession({
+          // Run detached — do NOT await, so the worker loop stays responsive
+          runPlanningTaskSession({
             id: planningTask.id,
             title: planningTask.title,
             description: planningTask.description,
             repoPath: planningTask.repoPath,
             planPath: planningTask.planPath,
             planningPersonaId: planningTask.planningPersonaId,
+            identifier: planningTask.identifier,
+            targetFiles: planningTask.targetFiles as unknown as string[] | undefined,
           }).catch(err => console.error(`Planning task ${planningTask.id} failed:`, err))
         } else {
           const task = await taskService.claimNextReadyTask()
@@ -129,7 +136,8 @@ export async function startQueueWorker() {
           if (task) {
             activeCount++
             console.log(`Claimed task ${task.id}: ${task.title}`)
-            await runTaskSession(task).catch(err => console.error(`Task ${task.id} failed with error:`, err))
+            // Run detached — do NOT await
+            runTaskSession(task).catch(err => console.error(`Task ${task.id} failed with error:`, err))
           } else {
             // No tasks ready — back off to avoid busy-looping the event loop
             await sleep(2000)

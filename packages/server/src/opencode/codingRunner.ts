@@ -5,6 +5,29 @@ import { exec } from "child_process"
 import { promisify } from "util"
 import { createOpencode } from "@opencode-ai/sdk"
 import { normalizeModel } from "./planningRunner"
+import { checkProviderAuth, loadProviderConfig } from "./authCheck"
+
+/**
+ * Poll GET /config/providers until the required providerID appears.
+ * Mirrors the same helper in planningRunner — providers initialise asynchronously
+ * and a prompt sent too early will be silently dropped.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function waitForProvider(
+  client: any,
+  providerID: string,
+  directory: string,
+  timeoutMs = 10_000
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const result = await client.config.providers({ query: { directory } })
+    const providers: Array<{ id?: string }> = (result.data as any)?.providers ?? []
+    if (providers.some((p) => p.id === providerID)) return
+    await new Promise((r) => setTimeout(r, 200))
+  }
+  throw new Error(`Provider "${providerID}" not ready after ${timeoutMs}ms`)
+}
 
 const execAsync = promisify(exec)
 
@@ -73,9 +96,19 @@ export async function runCodingSession(
     await mkdir(sessionDir, { recursive: true })
     await mkdir(diffDir, { recursive: true })
 
+    // Pre-flight: verify provider credentials before spawning an OpenCode server.
+    // Without this, an expired/missing token causes a silent hang with no error event.
+    const authCheck = await checkProviderAuth(input.codingPersona.provider || input.codingPersona.model)
+    if (!authCheck.ok) {
+      throw new Error(authCheck.errorMessage!)
+    }
+
+    // Inject API keys from auth.json / env vars into the spawned OpenCode server
+    // via OPENCODE_CONFIG_CONTENT so it can authenticate without reading auth.json itself.
+    const providerConfig = await loadProviderConfig()
     // Do NOT call server.close() after the session — closing the server kills
     // the process and breaks concurrent tasks.
-    const { client } = await createOpencode({ config: {} })
+    const { client } = await createOpencode({ config: { provider: providerConfig } })
 
     await logEvent(logPath, "CODING_EVENT", { status: "creating_session" })
     await onEvent("CODING_EVENT", { status: "creating_session", message: "Creating coding session" })
@@ -96,6 +129,11 @@ export async function runCodingSession(
     // model must be { providerID, modelID } — normalizeModel returns this shape
     const model = normalizeModel(input.codingPersona.model, input.codingPersona.provider)
 
+    // Wait for the provider to finish initialising before sending the prompt.
+    await waitForProvider(client, model.providerID, input.repoPath)
+    await logEvent(logPath, "CODING_EVENT", { status: "provider_ready", providerID: model.providerID })
+    await onEvent("CODING_EVENT", { status: "provider_ready", message: `Provider ${model.providerID} ready` })
+
     await logEvent(logPath, "CODING_EVENT", { status: "sending_prompt" })
     await onEvent("CODING_EVENT", { status: "sending_prompt", message: "Sending coding prompt" })
 
@@ -105,6 +143,7 @@ export async function runCodingSession(
       body: {
         model,
         agent: "build",
+        // noReply: true SUPPRESSES model execution entirely — do not set it.
         system: input.codingPersona.systemPrompt,
         tools: input.codingPersona.allowedTools.reduce(
           (acc: Record<string, boolean>, tool: string) => ({ ...acc, [tool]: true }),
@@ -113,7 +152,7 @@ export async function runCodingSession(
         parts: [
           {
             type: "text" as const,
-            text: input.taskDescription,
+            text: `IMPORTANT: Do not ask for confirmation or clarification. Proceed immediately and completely.\n\n${input.taskDescription}`,
           },
         ],
       },

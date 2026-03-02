@@ -1,5 +1,5 @@
 import { Button } from "../ui"
-import { useStartPlanning, useUpdateTaskStatus } from "../../api/tasks"
+import { useStartPlanning, useUpdateTaskStatus, useRetryTask } from "../../api/tasks"
 import type { Task } from "../../types/task"
 import { TaskStatus } from "../../types/task"
 
@@ -10,6 +10,7 @@ interface TaskActionBarProps {
 export function TaskActionBar({ task }: TaskActionBarProps) {
   const startPlanning = useStartPlanning()
   const updateStatus = useUpdateTaskStatus()
+  const retryTask = useRetryTask()
 
   const handleStartPlanning = () => {
     if (window.confirm("Start planning with " + task.planningPersonaName + "?")) {
@@ -141,6 +142,25 @@ export function TaskActionBar({ task }: TaskActionBarProps) {
           disabled={updateStatus.isPending}
         >
           Reject
+        </Button>
+      </div>
+    )
+  }
+
+  // FAILED tasks — allow retry (resets to DRAFT)
+  if (task.status === TaskStatus.FAILED) {
+    return (
+      <div className="flex items-center gap-2">
+        <Button
+          variant="secondary"
+          onClick={() => {
+            if (window.confirm("Retry this task? It will be reset to DRAFT.")) {
+              retryTask.mutate(task.id)
+            }
+          }}
+          disabled={retryTask.isPending}
+        >
+          {retryTask.isPending ? "Retrying..." : "Retry"}
         </Button>
       </div>
     )

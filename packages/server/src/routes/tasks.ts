@@ -188,6 +188,38 @@ tasksRouter.post("/:id/iterate-plan", async (c) => {
   return c.json(updated)
 })
 
+tasksRouter.post("/:id/retry", async (c) => {
+  const id = c.req.param("id")
+  const task = await taskService.getTask(id)
+
+  if (!task) {
+    return c.json({ error: "Task not found" }, 404)
+  }
+
+  if (task.status !== TaskStatus.FAILED) {
+    return c.json({ error: "Only FAILED tasks can be retried" }, 400)
+  }
+
+  const updated = await taskService.updateTaskStatus(id, TaskStatus.DRAFT, {
+    errorMessage: null,
+    sessionId: null,
+    diffPath: null,
+    startedAt: null,
+    completedAt: null,
+  })
+  if (!updated) {
+    return c.json({ error: "Failed to reset task status" }, 500)
+  }
+
+  await eventService.appendEvent(id, "STATUS_CHANGE", {
+    from: TaskStatus.FAILED,
+    to: TaskStatus.DRAFT,
+    reason: "retried by user",
+  })
+
+  return c.json(updated)
+})
+
 tasksRouter.get("/:id/diff", async (c) => {
   const id = c.req.param("id")
   const task = await taskService.getTask(id)

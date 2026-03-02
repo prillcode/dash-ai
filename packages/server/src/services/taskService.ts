@@ -160,7 +160,13 @@ export const claimNextPendingTask = claimNextReadyTask
 
 export async function resetStuckTasks(): Promise<number> {
   const result = await db.update(tasks)
-    .set({ status: TaskStatus.DRAFT, updatedAt: now() })
+    .set({
+      status: TaskStatus.DRAFT,
+      sessionId: null,
+      startedAt: null,
+      errorMessage: null,
+      updatedAt: now(),
+    } as Partial<Task>)
     .where(inArray(tasks.status, [TaskStatus.IN_PLANNING, TaskStatus.QUEUED, TaskStatus.RUNNING]))
     .returning()
   

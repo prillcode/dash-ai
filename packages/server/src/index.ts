@@ -12,6 +12,7 @@ import { tasksRouter } from "./routes/tasks"
 import { eventsRouter } from "./routes/events"
 import { modelsRouter } from "./routes/models"
 import { projectsRouter } from "./routes/projects"
+import { authRouter } from "./routes/auth"
 import { authMiddleware } from "./middleware/auth"
 import { loggerMiddleware } from "./middleware/logger"
 import { startQueueWorker } from "./services/queueWorker"
@@ -35,6 +36,7 @@ app.route("/api/personas", personasRouter)
 app.route("/api/tasks", tasksRouter)
 app.route("/api/tasks/:taskId/events", eventsRouter)
 app.route("/api/projects", projectsRouter)
+app.route("/api/auth", authRouter)
 
 app.use("/*", serveStatic({ root: clientDistPath }))
 

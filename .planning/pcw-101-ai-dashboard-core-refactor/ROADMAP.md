@@ -101,6 +101,24 @@
 
 ---
 
+### Phase 05B: Interactive Prompt Passthrough
+**Status:** 📋 Planned
+
+**Goals:**
+- Add `autoApproveTools` + `interactive` boolean flags to personas (DB + service + routes)
+- Runners handle `permission.updated` events: auto-approve when flag is on, pause + emit event when off
+- Runners detect agent questions on `session.idle` in interactive mode; emit `AGENT_QUESTION` event
+- `POST /api/tasks/:id/respond` endpoint for UI to reply to paused sessions (stubbed in 05b-02, full impl later)
+- `AgentPromptBanner` component surfaces questions/permissions to user on TaskDetailPage
+- Persona form gets "Interaction Settings" section with both toggles
+
+**Plans:**
+- `05b-01` 📋 — DB + server: persona schema migration + service + route updates
+- `05b-02` 📋 — Runner layer: permission/question handling + respond endpoint
+- `05b-03` 📋 — Client: AgentPromptBanner + persona toggles + human verify checkpoint
+
+---
+
 ### Phase 06: Setup, Portability & Documentation
 **Status:** 📋 Planned — all plans written, ready for execution
 

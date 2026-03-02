@@ -2,6 +2,31 @@ import { homedir } from "os"
 import { join } from "path"
 import { existsSync } from "fs"
 import { createOpencode } from "@opencode-ai/sdk"
+import { checkProviderAuth, loadProviderConfig } from "./authCheck"
+
+/**
+ * Poll GET /config/providers until the required providerID appears in the list.
+ * The spawned `opencode serve` process initialises providers asynchronously; sending
+ * a prompt before they are ready causes the model call to be silently dropped.
+ *
+ * Polls every 200ms, times out after 10s.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function waitForProvider(
+  client: any,
+  providerID: string,
+  directory: string,
+  timeoutMs = 10_000
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const result = await client.config.providers({ query: { directory } })
+    const providers: Array<{ id?: string }> = (result.data as any)?.providers ?? []
+    if (providers.some((p) => p.id === providerID)) return
+    await new Promise((r) => setTimeout(r, 200))
+  }
+  throw new Error(`Provider "${providerID}" not ready after ${timeoutMs}ms`)
+}
 
 export function checkSkillsInstalled(): { ok: boolean; missing: string[] } {
   const required = ["start-work", "create-plans"]
@@ -23,6 +48,8 @@ export interface PlanningRunnerInput {
   taskId: string
   taskTitle: string
   taskDescription: string
+  taskIdentifier?: string   // e.g. "CD-101" — passed to /start-work as the work identifier
+  targetFiles?: string[]    // relevant files, passed as context to /start-work
   repoPath: string
   planPath?: string
   planningPersona: {
@@ -41,15 +68,65 @@ export interface PlanningResult {
   errorMessage?: string
 }
 
+function buildPlanningPrompt(input: PlanningRunnerInput): string {
+  const identifier = input.taskIdentifier ?? ""
+  // Derive a kebab-case work name from the task title for /start-work
+  const workName = input.taskTitle
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40)
+
+  const filesSection = input.targetFiles?.length
+    ? `\n## Relevant files\n${input.targetFiles.map((f) => `- ${f}`).join("\n")}`
+    : ""
+
+  return [
+    `You are a planning agent. Your only job is to scaffold and write planning documents.`,
+    `Do NOT write, create, or modify any source code files. Do NOT implement the feature.`,
+    ``,
+    `## Instructions`,
+    ``,
+    `1. Load the /start-work skill and run it with the following pre-supplied answers`,
+    `   (do not ask the user any questions — all information is provided below):`,
+    `   - Identifier: ${identifier || "(auto-generate)"}`,
+    `   - Work name: ${workName}`,
+    `   - Description: ${input.taskDescription}`,
+    `   - Work type: Feature`,
+    `   - Relevant files: ${input.targetFiles?.join(", ") || "(scan automatically)"}`,
+    ``,
+    `2. Once the .planning/ directory is scaffolded, load the /create-plans skill`,
+    `   and produce the plan files for the task described below.`,
+    ``,
+    `3. When all plan files are written, stop. Do not implement anything.`,
+    ``,
+    `## Task`,
+    `Title: ${input.taskTitle}`,
+    `Description: ${input.taskDescription}`,
+    filesSection,
+  ].join("\n")
+}
+
 export async function runPlanningSession(
   input: PlanningRunnerInput,
   onEvent: (type: string, payload: Record<string, unknown>) => Promise<void>
 ): Promise<PlanningResult> {
   try {
     await onEvent("PLANNING_EVENT", { status: "starting", message: "Initializing OpenCode SDK" })
+
+    // Pre-flight: verify provider credentials before spawning an OpenCode server.
+    // Without this, an expired/missing token causes a silent hang with no error event.
+    const authCheck = await checkProviderAuth(input.planningPersona.provider || input.planningPersona.model)
+    if (!authCheck.ok) {
+      throw new Error(authCheck.errorMessage!)
+    }
+
     await onEvent("PLANNING_EVENT", { status: "creating_session", message: "Creating planning session" })
 
-    const { client } = await createOpencode({ config: {} })
+    // Inject API keys from auth.json / env vars into the spawned OpenCode server
+    // via OPENCODE_CONFIG_CONTENT so it can authenticate without reading auth.json itself.
+    const providerConfig = await loadProviderConfig()
+    const { client } = await createOpencode({ config: { provider: providerConfig } })
 
     const createResult = await client.session.create({
       query: { directory: input.repoPath },
@@ -63,6 +140,23 @@ export async function runPlanningSession(
     const sessionId = createResult.data.id
     await onEvent("PLANNING_EVENT", { status: "session_created", sessionId })
 
+    // Wait for the required provider to finish initialising before sending the prompt.
+    // The spawned opencode serve process initialises providers asynchronously; if we
+    // send the prompt while the provider is still loading, the model call is silently
+    // dropped and the session hangs indefinitely with only heartbeat events.
+    const { providerID } = normalizeModel(input.planningPersona.model, input.planningPersona.provider)
+    await waitForProvider(client, providerID, input.repoPath)
+    await onEvent("PLANNING_EVENT", { status: "provider_ready", message: `Provider ${providerID} ready` })
+
+    // Subscribe to the event stream BEFORE sending the prompt to avoid a race
+    // condition where the session completes before we start listening.
+    // EventSessionIdle   { type: "session.idle",   properties: { sessionID } }
+    // EventSessionStatus { type: "session.status", properties: { sessionID, status: { type: "idle" } } }
+    // EventSessionError  { type: "session.error",  properties: { sessionID?, error } }
+    const eventResult = await client.event.subscribe({
+      query: { directory: input.repoPath },
+    })
+
     const model = normalizeModel(input.planningPersona.model, input.planningPersona.provider)
 
     await onEvent("PLANNING_EVENT", { status: "sending_prompt", message: "Sending planning prompt" })
@@ -72,12 +166,16 @@ export async function runPlanningSession(
       query: { directory: input.repoPath },
       body: {
         model,
-        agent: "plan",
+        // Use "build" agent, not "plan" — OpenCode's "plan" agent is its own interactive
+        // planning mode that restricts writes to .opencode/plans/*.md only, which is not
+        // what we want. Behavior is controlled entirely by Probi's system prompt instead.
+        agent: "build",
+        // noReply: true SUPPRESSES model execution entirely — do not set it.
         system: input.planningPersona.systemPrompt,
         parts: [
           {
             type: "text" as const,
-            text: input.taskDescription,
+            text: buildPlanningPrompt(input),
           },
         ],
       },
@@ -89,58 +187,140 @@ export async function runPlanningSession(
 
     await onEvent("PLANNING_EVENT", { status: "prompt_sent", message: "Planning prompt sent, waiting for completion" })
 
-    // Subscribe to the global event stream and filter for this session.
-    // The SSE result exposes a .stream AsyncGenerator — iterate that, not the result itself.
-    // Completion:  EventSessionIdle   { type: "session.idle",   properties: { sessionID } }
-    //              EventSessionStatus { type: "session.status", properties: { sessionID, status: { type: "idle" } } }
-    // Error:       EventSessionError  { type: "session.error",  properties: { sessionID, error } }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const anyClient = client as any
     let completed = false
     let sessionError: string | undefined
 
-    try {
-      const eventResult = await client.event.subscribe({
-        query: { directory: input.repoPath },
-      })
+    // Wall-clock timeout: 15 minutes for a planning session
+    const SESSION_TIMEOUT_MS = 15 * 60 * 1000
+    const deadline = Date.now() + SESSION_TIMEOUT_MS
 
-      for await (const raw of eventResult.stream) {
-        const evt = raw as { type: string; properties?: Record<string, any> }
-        const props = evt.properties || {}
+    /**
+     * Poll session messages every 5s as a belt-and-suspenders fallback.
+     * The SSE stream is a long-lived connection that never closes on its own,
+     * so session.idle can be missed if emitted before we start consuming.
+     * When we detect completion via poll, we signal via the abort controller
+     * to break out of the stream loop.
+     */
+    const abortController = new AbortController()
 
-        // Filter to our session only
-        if (props.sessionID && props.sessionID !== sessionId) continue
-
-        await onEvent("PLANNING_EVENT", { status: evt.type, ...props })
-
-        if (evt.type === "session.idle") {
-          completed = true
-          break
-        }
-
-        if (evt.type === "session.status" && props.status?.type === "idle") {
-          completed = true
-          break
-        }
-
-        if (evt.type === "session.error") {
-          const err = props.error
-          sessionError = err?.data?.message || err?.name || JSON.stringify(err) || "Unknown session error"
-          break
+    const pollForCompletion = async (): Promise<"completed" | "error" | "timeout"> => {
+      while (!abortController.signal.aborted) {
+        if (Date.now() > deadline) return "timeout"
+        await new Promise((r) => setTimeout(r, 5_000))
+        if (abortController.signal.aborted) break
+        try {
+          const msgsResult = await anyClient.session.messages({
+            path: { id: sessionId },
+            query: { directory: input.repoPath },
+          })
+          const msgs: any[] = msgsResult.data ?? []
+          const lastAssistant = msgs.filter((m: any) => m.info?.role === "assistant").at(-1)
+          if (lastAssistant?.info?.finish === "stop") return "completed"
+          // Check for error finish
+          if (lastAssistant?.info?.finish === "error") {
+            sessionError = lastAssistant?.info?.error?.message ?? "Session finished with error"
+            return "error"
+          }
+          // Also check pending questions and auto-answer them
+          const qList = await anyClient.question.list({ query: { directory: input.repoPath } })
+          const pending: any[] = qList.data ?? []
+          for (const q of pending) {
+            if (q.sessionID !== sessionId) continue
+            if (!q.questions?.length) continue
+            const answers = q.questions.map((question: any) => [question.options?.[0]?.label ?? "yes"])
+            await anyClient.question.reply({
+              path: { requestID: q.id },
+              query: { directory: input.repoPath },
+              body: { answers },
+            })
+            await onEvent("PLANNING_EVENT", { status: "question.answered", questionId: q.id, answers })
+          }
+        } catch {
+          // Transient poll error — keep trying
         }
       }
-    } catch (streamError) {
-      const msg = streamError instanceof Error ? streamError.message : String(streamError)
-      if (msg.includes("timeout") || msg.includes("aborted")) {
-        throw new Error("Planning session timed out waiting for completion")
+      return "completed"
+    }
+
+    // Run event stream and poll concurrently; whichever signals completion wins.
+    const streamLoop = async (): Promise<void> => {
+      try {
+        for await (const raw of eventResult.stream) {
+          if (abortController.signal.aborted) break
+          const evt = raw as { type: string; properties?: Record<string, any> }
+          const props = evt.properties || {}
+
+          // Filter to our session only (heartbeats etc have no sessionID — let them through for UI)
+          if (props.sessionID && props.sessionID !== sessionId) continue
+
+          await onEvent("PLANNING_EVENT", { status: evt.type, ...props })
+
+          // Auto-answer questions inline from the stream as well
+          if (evt.type === "question.asked") {
+            try {
+              const questionId = props.id as string | undefined
+              if (questionId) {
+                const questionList = await anyClient.question.list({ query: { directory: input.repoPath } })
+                const pendingQs: any[] = questionList.data ?? []
+                const q = pendingQs.find((p: any) => p.id === questionId)
+                if (q?.questions?.length) {
+                  const answers = q.questions.map((question: any) => [question.options?.[0]?.label ?? "yes"])
+                  await anyClient.question.reply({
+                    path: { requestID: questionId },
+                    query: { directory: input.repoPath },
+                    body: { answers },
+                  })
+                  await onEvent("PLANNING_EVENT", { status: "question.answered", questionId, answers })
+                }
+              }
+            } catch (qErr) {
+              await onEvent("PLANNING_EVENT", { status: "question.answer_failed", error: String(qErr) })
+            }
+          }
+
+          if (evt.type === "session.idle" && props.sessionID === sessionId) {
+            abortController.abort()
+            completed = true
+            return
+          }
+          if (evt.type === "session.status" && props.sessionID === sessionId && props.status?.type === "idle") {
+            abortController.abort()
+            completed = true
+            return
+          }
+          if (evt.type === "session.error" && (!props.sessionID || props.sessionID === sessionId)) {
+            const err = props.error
+            sessionError = err?.data?.message || err?.name || JSON.stringify(err) || "Unknown session error"
+            abortController.abort()
+            return
+          }
+        }
+      } catch (streamError) {
+        if (abortController.signal.aborted) return // expected — poll won the race
+        const msg = streamError instanceof Error ? streamError.message : String(streamError)
+        if (!msg.includes("aborted")) throw streamError
       }
-      throw streamError
+    }
+
+    const [pollResult] = await Promise.all([pollForCompletion(), streamLoop()])
+    abortController.abort() // ensure stream loop exits if poll won
+
+    if (!completed) {
+      if (pollResult === "timeout") {
+        throw new Error(`Planning session timed out after ${SESSION_TIMEOUT_MS / 60000} minutes`)
+      }
+      if (pollResult === "error" || sessionError) {
+        throw new Error(`Planning session error: ${sessionError ?? "unknown"}`)
+      }
+      // Poll detected completion via message finish
+      await onEvent("PLANNING_EVENT", { status: "session.idle", sessionID: sessionId, source: "poll" })
+      completed = true
     }
 
     if (sessionError) {
       throw new Error(`Planning session error: ${sessionError}`)
-    }
-
-    if (!completed) {
-      throw new Error("Planning session ended without completion signal")
     }
 
     await onEvent("PLANNING_EVENT", { status: "completed", message: "Planning session finished" })

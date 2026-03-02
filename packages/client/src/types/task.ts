@@ -62,7 +62,7 @@ export interface TaskFilters {
 export interface TaskEvent {
   id: string
   taskId: string
-  eventType: "STATUS_CHANGE" | "TOOL_CALL" | "AGENT_OUTPUT" | "ERROR" | "REVIEW_ACTION"
+  eventType: "STATUS_CHANGE" | "TOOL_CALL" | "AGENT_OUTPUT" | "ERROR" | "REVIEW_ACTION" | "PLANNING_EVENT" | "CODING_EVENT" | "AGENT_QUESTION" | "PLAN_FEEDBACK"
   payload: unknown
   createdAt: string
 }

@@ -128,6 +128,20 @@ export function useMarkReadyToCode() {
   })
 }
 
+export function useRetryTask() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiClient<Task>(`/api/tasks/${id}/retry`, {
+        method: "POST",
+      }),
+    onSuccess: (task) => {
+      queryClient.invalidateQueries({ queryKey: ["task", task.id] })
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+    },
+  })
+}
+
 export function useTaskDiff(id: string, enabled = false) {
   return useQuery({
     queryKey: ["task-diff", id],

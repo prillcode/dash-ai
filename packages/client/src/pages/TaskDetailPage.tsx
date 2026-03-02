@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom"
 import { useTask } from "../api/tasks"
 import { TaskStatusBadge, TaskActionBar, PlanningSection } from "../components/tasks"
+import { AuthWarningBanner } from "../components/tasks/AuthWarningBanner"
 import { TaskTimelinePanel } from "../components/timeline"
 import { DiffReviewPanel } from "../components/diff"
 import { Spinner, Badge, Button } from "../components/ui"
@@ -37,6 +38,14 @@ export function TaskDetailPage() {
           <TaskStatusBadge status={task.status} />
         </div>
         <TaskActionBar task={task} />
+      </div>
+
+      {/* Auth preflight banners — check both personas independently */}
+      <div className="space-y-2">
+        {task.planningPersonaId && (
+          <AuthWarningBanner personaId={task.planningPersonaId} label="Planning" />
+        )}
+        <AuthWarningBanner personaId={task.codingPersonaId} label="Coding" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
