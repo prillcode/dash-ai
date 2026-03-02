@@ -111,6 +111,9 @@ export async function runPlanningSession(
   input: PlanningRunnerInput,
   onEvent: (type: string, payload: Record<string, unknown>) => Promise<void>
 ): Promise<PlanningResult> {
+  // Hoisted so the finally block can always kill the spawned opencode serve process.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let server: any = null
   try {
     await onEvent("PLANNING_EVENT", { status: "starting", message: "Initializing OpenCode SDK" })
 
@@ -126,7 +129,9 @@ export async function runPlanningSession(
     // Inject API keys from auth.json / env vars into the spawned OpenCode server
     // via OPENCODE_CONFIG_CONTENT so it can authenticate without reading auth.json itself.
     const providerConfig = await loadProviderConfig()
-    const { client } = await createOpencode({ config: { provider: providerConfig } })
+    const opencodeInstance = await createOpencode({ config: { provider: providerConfig } })
+    server = opencodeInstance.server
+    const client = opencodeInstance.client
 
     const createResult = await client.session.create({
       query: { directory: input.repoPath },
@@ -383,5 +388,10 @@ export async function runPlanningSession(
       planDocPath: join(input.repoPath, ".planning", input.planPath || ""),
       errorMessage,
     }
+  } finally {
+    // Always kill the spawned `opencode serve` process when the session ends.
+    // Without this, the process lingers and holds port 4096, causing "Failed to start
+    // server on port 4096" errors on the next run.
+    try { (server as any)?.close() } catch { /* ignore */ }
   }
 }

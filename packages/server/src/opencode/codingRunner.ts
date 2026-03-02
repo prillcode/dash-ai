@@ -92,6 +92,9 @@ export async function runCodingSession(
   const logPath = join(sessionDir, "session.log")
   const diffPath = join(diffDir, "changes.diff")
 
+  // Hoisted so the finally block can always kill the spawned opencode serve process.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let server: any = null
   try {
     await mkdir(sessionDir, { recursive: true })
     await mkdir(diffDir, { recursive: true })
@@ -106,9 +109,9 @@ export async function runCodingSession(
     // Inject API keys from auth.json / env vars into the spawned OpenCode server
     // via OPENCODE_CONFIG_CONTENT so it can authenticate without reading auth.json itself.
     const providerConfig = await loadProviderConfig()
-    // Do NOT call server.close() after the session — closing the server kills
-    // the process and breaks concurrent tasks.
-    const { client } = await createOpencode({ config: { provider: providerConfig } })
+    const opencodeInstance = await createOpencode({ config: { provider: providerConfig } })
+    server = opencodeInstance.server
+    const client = opencodeInstance.client
 
     await logEvent(logPath, "CODING_EVENT", { status: "creating_session" })
     await onEvent("CODING_EVENT", { status: "creating_session", message: "Creating coding session" })
@@ -315,5 +318,10 @@ export async function runCodingSession(
       sessionId: "",
       errorMessage,
     }
+  } finally {
+    // Always kill the spawned `opencode serve` process when the session ends.
+    // Without this, the process lingers and holds port 4096, causing
+    // "Failed to start server on port 4096" errors on the next run.
+    try { server?.close() } catch { /* ignore */ }
   }
 }
