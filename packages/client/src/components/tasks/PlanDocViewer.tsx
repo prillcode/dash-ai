@@ -28,7 +28,7 @@ export function PlanDocViewer({ taskId, file, title }: PlanDocViewerProps) {
   const html = marked.parse(data.content, { async: false }) as string
 
   return (
-    <details open className="border border-border rounded">
+    <details className="border border-border rounded">
       <summary className="px-3 py-2 cursor-pointer font-medium text-sm bg-hover-subtle hover:bg-border rounded select-none">
         {title}
       </summary>
