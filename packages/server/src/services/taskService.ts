@@ -4,9 +4,10 @@ import * as projectService from "./projectService"
 import { tasks, TaskStatus } from "../db/schema"
 import { generateId } from "../utils/id"
 import { now } from "../utils/time"
-import { readFile } from "fs/promises"
+import { readFile, readdir } from "fs/promises"
 import { existsSync } from "fs"
 import { join } from "path"
+import { execSync } from "child_process"
 
 type Task = typeof tasks.$inferSelect
 type NewTask = typeof tasks.$inferInsert
@@ -209,5 +210,130 @@ export async function readPlanDoc(
     return await readFile(fullPath, "utf-8")
   } catch {
     return null
+  }
+}
+
+export interface ValidationResult {
+  /** Whether the codebase shows signs that work was completed */
+  likelyComplete: boolean
+  /** Recent commits in the repo since the task was started (or last 24h if no startedAt) */
+  recentCommits: Array<{ hash: string; message: string; date: string; author: string }>
+  /** Files mentioned in plan docs that exist in the repo */
+  planFilesFound: string[]
+  /** Files mentioned in plan docs that are missing from the repo */
+  planFilesMissing: string[]
+  /** Files modified by recent commits */
+  recentlyChangedFiles: string[]
+  /** Plan files (BRIEF.md, ROADMAP.md, phase plans) found in .planning/ */
+  planDocsFound: string[]
+  /** Human-readable summary */
+  summary: string
+}
+
+/**
+ * Validate whether work for a task appears to have been completed in the repo.
+ * Uses git log and filesystem checks — no AI involved, fast and reliable.
+ */
+export async function validateTask(id: string): Promise<ValidationResult | null> {
+  const task = await getTask(id)
+  if (!task) return null
+
+  const repoPath = task.repoPath
+  const since = task.startedAt ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+  // 1. Recent git commits since task started
+  let recentCommits: ValidationResult["recentCommits"] = []
+  let recentlyChangedFiles: string[] = []
+  try {
+    const logOutput = execSync(
+      `git log --since="${since}" --format="%H|%s|%ai|%an" --no-merges`,
+      { cwd: repoPath, encoding: "utf-8", timeout: 10_000 }
+    ).trim()
+    if (logOutput) {
+      recentCommits = logOutput.split("\n").map((line) => {
+        const [hash, message, date, author] = line.split("|")
+        return { hash: hash.slice(0, 8), message, date, author }
+      })
+    }
+
+    // Files changed in those commits
+    if (recentCommits.length > 0) {
+      const diffOutput = execSync(
+        `git diff --name-only HEAD~${Math.min(recentCommits.length, 10)} HEAD 2>/dev/null || git diff --name-only HEAD`,
+        { cwd: repoPath, encoding: "utf-8", timeout: 10_000 }
+      ).trim()
+      recentlyChangedFiles = diffOutput ? diffOutput.split("\n").filter(Boolean) : []
+    }
+  } catch {
+    // Not a git repo or git not available — continue with other checks
+  }
+
+  // 2. Extract file paths mentioned in plan docs
+  const mentionedFiles: string[] = []
+  if (task.planPath) {
+    const planContent = [
+      await readPlanDoc(task.repoPath, task.planPath, "BRIEF.md"),
+      await readPlanDoc(task.repoPath, task.planPath, "ROADMAP.md"),
+    ].filter(Boolean).join("\n")
+
+    // Match paths that look like source files: src/foo/bar.ts, packages/x/y.ts, etc.
+    const filePattern = /\b([\w.-]+\/[\w./-]+\.\w{1,6})\b/g
+    const matches = [...planContent.matchAll(filePattern)].map((m) => m[1])
+    mentionedFiles.push(...[...new Set(matches)])
+  }
+
+  // Also include targetFiles from the task
+  mentionedFiles.push(...(task.targetFiles ?? []))
+
+  const uniqueFiles = [...new Set(mentionedFiles)]
+  const planFilesFound = uniqueFiles.filter((f) => existsSync(join(repoPath, f)))
+  const planFilesMissing = uniqueFiles.filter((f) => !existsSync(join(repoPath, f)))
+
+  // 3. List plan docs in .planning/
+  const planDocsFound: string[] = []
+  if (task.planPath) {
+    const planDir = join(repoPath, ".planning", task.planPath)
+    try {
+      const walk = async (dir: string, base: string): Promise<void> => {
+        const entries = await readdir(dir, { withFileTypes: true })
+        for (const e of entries) {
+          if (e.isDirectory()) await walk(join(dir, e.name), `${base}${e.name}/`)
+          else planDocsFound.push(`${base}${e.name}`)
+        }
+      }
+      await walk(planDir, "")
+    } catch { /* planPath doesn't exist yet */ }
+  }
+
+  // 4. Determine likely completion
+  const hasCommits = recentCommits.length > 0
+  const hasPlanDocs = planDocsFound.some((f) => f.endsWith("BRIEF.md") || f.endsWith("ROADMAP.md") || f.includes("PLAN.md"))
+  const likelyComplete = hasCommits || hasPlanDocs
+
+  // 5. Summary
+  const parts: string[] = []
+  if (recentCommits.length > 0) {
+    parts.push(`${recentCommits.length} commit${recentCommits.length > 1 ? "s" : ""} found since task started`)
+  } else {
+    parts.push("No commits found since task started")
+  }
+  if (hasPlanDocs) {
+    parts.push(`${planDocsFound.length} plan doc${planDocsFound.length > 1 ? "s" : ""} found in .planning/`)
+  }
+  if (planFilesFound.length > 0) {
+    parts.push(`${planFilesFound.length} referenced file${planFilesFound.length > 1 ? "s" : ""} exist in repo`)
+  }
+  if (planFilesMissing.length > 0) {
+    parts.push(`${planFilesMissing.length} referenced file${planFilesMissing.length > 1 ? "s" : ""} not yet created`)
+  }
+
+  return {
+    likelyComplete,
+    recentCommits,
+    planFilesFound,
+    planFilesMissing,
+    recentlyChangedFiles,
+    planDocsFound,
+    summary: parts.join(" · "),
   }
 }

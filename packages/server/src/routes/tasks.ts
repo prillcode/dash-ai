@@ -268,3 +268,10 @@ tasksRouter.get("/:id/plan-doc", async (c) => {
 
   return c.json({ file, content })
 })
+
+tasksRouter.post("/:id/validate", async (c) => {
+  const id = c.req.param("id")
+  const result = await taskService.validateTask(id)
+  if (!result) return c.json({ error: "Task not found" }, 404)
+  return c.json(result)
+})

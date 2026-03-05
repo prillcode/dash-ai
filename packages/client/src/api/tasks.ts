@@ -150,3 +150,20 @@ export function useTaskDiff(id: string, enabled = false) {
     enabled,
   })
 }
+
+export interface ValidationResult {
+  likelyComplete: boolean
+  recentCommits: Array<{ hash: string; message: string; date: string; author: string }>
+  planFilesFound: string[]
+  planFilesMissing: string[]
+  recentlyChangedFiles: string[]
+  planDocsFound: string[]
+  summary: string
+}
+
+export function useValidateTask(id: string) {
+  return useMutation({
+    mutationFn: (): Promise<ValidationResult> =>
+      apiClient(`/api/tasks/${id}/validate`, { method: "POST" }),
+  })
+}
