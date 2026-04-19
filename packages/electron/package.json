@@ -4,8 +4,8 @@
   "private": true,
   "main": "dist/main.js",
   "scripts": {
-    "dev": "npm run build:main && npm run build:preload && electron . -- --no-sandbox --disable-gpu --disable-software-rasterizer",
-    "build": "npm run build:main && npm run build:preload && npm run build:renderer",
+    "dev": "pnpm run build:main && pnpm run build:preload && electron .",
+    "build": "pnpm run build:main && pnpm run build:preload && pnpm run build:renderer",
     "build:main": "vite build --config vite.main.config.ts",
     "build:preload": "vite build --config vite.preload.config.ts",
     "build:renderer": "pnpm --filter client build",
@@ -16,9 +16,11 @@
     "dist:win": "electron-builder --win"
   },
   "dependencies": {
-    "@dash-ai/server": "workspace:*"
+    "@dash-ai/server": "workspace:*",
+    "mime-types": "^3.0.2"
   },
   "devDependencies": {
+    "@types/mime-types": "^3.0.1",
     "electron": "^30.0.0",
     "electron-builder": "^24.13.0",
     "electron-vite": "^2.2.0",
@@ -42,13 +44,22 @@
       }
     ],
     "mac": {
-      "target": ["dmg", "zip"]
+      "target": [
+        "dmg",
+        "zip"
+      ]
     },
     "linux": {
-      "target": ["AppImage", "deb"]
+      "target": [
+        "AppImage",
+        "deb"
+      ]
     },
     "win": {
-      "target": ["nsis", "portable"]
+      "target": [
+        "nsis",
+        "portable"
+      ]
     }
   }
 }

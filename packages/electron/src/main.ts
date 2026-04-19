@@ -1,9 +1,10 @@
-import { app, BrowserWindow, ipcMain, protocol } from "electron"
+import { app, BrowserWindow, ipcMain } from "electron"
 import { spawn } from "child_process"
 import { join } from "path"
 import { homedir } from "os"
-import { readFile } from "fs/promises"
-import { fileURLToPath } from "url"
+import { createServer } from "http"
+import { readFile } from "fs"
+import { lookup } from "mime-types"
 
 // Disable GPU for headless/CI environments
 app.commandLine.appendSwitch("disable-gpu")
@@ -13,43 +14,59 @@ app.commandLine.appendSwitch("no-sandbox")
 // Keep a global reference of the window object
 let mainWindow: BrowserWindow | null = null
 let serverProcess: ReturnType<typeof spawn> | null = null
+let staticServer: ReturnType<typeof createServer> | null = null
+let staticServerPort: number | null = null
 
-// Server configuration
-const SERVER_PORT = 0 // 0 = random available port
+// API Server configuration
 let serverUrl: string | null = null
 let serverToken: string | null = null
 
-// Protocol for serving client files
-const PROTOCOL = "dashai"
-
-// Register protocol to serve client files
-function registerProtocol() {
-  protocol.registerFileProtocol(PROTOCOL, async (request, callback) => {
-    const url = new URL(request.url)
-    let pathname = url.pathname
-    
-    // Default to index.html for root
-    if (pathname === "/") {
-      pathname = "/index.html"
-    }
-    
-    // Serve from client dist
-    const clientDist = join(__dirname, "../../client/dist")
-    const filePath = join(clientDist, pathname)
-    
-    try {
-      // Check if file exists
-      await readFile(filePath)
-      callback(filePath)
-    } catch {
-      // Fallback to index.html for SPA routing
-      callback(join(clientDist, "index.html"))
-    }
-  })
-}
-
 function generateToken(): string {
   return `electron-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+// Start a simple HTTP server to serve the React client static files
+function startStaticServer(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const clientDist = join(__dirname, "../../client/dist")
+    
+    staticServer = createServer((req, res) => {
+      let pathname = req.url || "/"
+      if (pathname === "/") pathname = "/index.html"
+      
+      const filePath = join(clientDist, pathname)
+      
+      readFile(filePath, (err, data) => {
+        if (err) {
+          // Fallback to index.html for SPA routing
+          readFile(join(clientDist, "index.html"), (err2, data2) => {
+            if (err2) {
+              res.writeHead(404)
+              res.end("Not found")
+            } else {
+              res.writeHead(200, { "Content-Type": "text/html" })
+              res.end(data2)
+            }
+          })
+        } else {
+          const mimeType = lookup(filePath) || "application/octet-stream"
+          res.writeHead(200, { "Content-Type": mimeType })
+          res.end(data)
+        }
+      })
+    })
+    
+    staticServer.listen(0, "127.0.0.1", () => {
+      const addr = staticServer?.address()
+      if (addr && typeof addr === "object") {
+        staticServerPort = addr.port
+        console.log("[static] Client server running on http://127.0.0.1:" + staticServerPort)
+        resolve(staticServerPort)
+      } else {
+        reject(new Error("Failed to get server port"))
+      }
+    })
+  })
 }
 
 async function startEmbeddedServer(): Promise<{ url: string; token: string }> {
@@ -64,10 +81,6 @@ async function startEmbeddedServer(): Promise<{ url: string; token: string }> {
   const serverSrc = join(__dirname, "../../server/src/index.ts")
   const tsxBin = join(__dirname, "../../cli/node_modules/.bin/tsx")
 
-  // Alternative: use built dist if available
-  const serverDist = join(__dirname, "../server/dist/index.js")
-  const useDist = false // prefer tsx for development
-
   const env = {
     ...process.env,
     PORT: "0", // Random port
@@ -77,8 +90,8 @@ async function startEmbeddedServer(): Promise<{ url: string; token: string }> {
   }
 
   serverProcess = spawn(
-    useDist ? process.execPath : tsxBin,
-    useDist ? [serverDist] : [serverSrc],
+    tsxBin,
+    [serverSrc],
     {
       env,
       stdio: ["ignore", "pipe", "pipe"],
@@ -128,11 +141,15 @@ async function stopEmbeddedServer() {
     serverProcess.kill("SIGTERM")
     serverProcess = null
   }
+  if (staticServer) {
+    staticServer.close()
+    staticServer = null
+  }
   serverUrl = null
   serverToken = null
 }
 
-function createWindow() {
+function createWindow(clientPort: number) {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -144,13 +161,13 @@ function createWindow() {
     titleBarStyle: "hiddenInset",
   })
 
-  // Load the React app
+  // Load the React app from local static server
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL)
     mainWindow.webContents.openDevTools()
   } else {
-    // In production, serve via custom protocol
-    mainWindow.loadURL(`${PROTOCOL}://dashai/`)
+    // Load from our static file server
+    mainWindow.loadURL(`http://127.0.0.1:${clientPort}`)
   }
 
   mainWindow.on("closed", () => {
@@ -170,21 +187,23 @@ ipcMain.handle("server:stop", async () => {
 
 // App lifecycle
 app.whenReady().then(async () => {
-  // Register custom protocol for serving client files
-  registerProtocol()
-
-  // Start the embedded server first
+  // Start the static file server first
   try {
+    const clientPort = await startStaticServer()
+    
+    // Start the API server
     await startEmbeddedServer()
-    createWindow()
+    
+    // Create window after both servers are ready
+    createWindow(clientPort)
   } catch (err) {
-    console.error("Failed to start server:", err)
+    console.error("Failed to start:", err)
     app.quit()
   }
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow()
+    if (BrowserWindow.getAllWindows().length === 0 && staticServerPort) {
+      createWindow(staticServerPort)
     }
   })
 })
