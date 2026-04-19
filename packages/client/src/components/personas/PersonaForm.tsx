@@ -215,24 +215,41 @@ export function PersonaForm({ initialData, onSubmit, isLoading }: PersonaFormPro
         )}
       </div>
 
-      {/* Provider + Model cascading selects */}
+      {/* Provider + Model cascading selects - only show configured providers */}
       <div className="space-y-1">
         <label className="block text-sm font-medium text-muted">Provider</label>
         {modelsData ? (
-          <select
-            value={watch("provider") ?? "anthropic"}
-            onChange={(e) => {
-              const newProvider = e.target.value
-              setValue("provider", newProvider)
-              const providerEntry = modelsData.providers.find(p => p.id === newProvider)
-              if (providerEntry?.models[0]) setValue("model", providerEntry.models[0].id)
-            }}
-            className="form-input w-full px-3 py-2 text-sm"
-          >
-            {modelsData.providers.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+          (() => {
+            // Filter to only providers with auth configured
+            const configuredProviders = modelsData.providers.filter(p => 
+              modelsData.authMethods[p.id]?.configured
+            )
+            
+            if (configuredProviders.length === 0) {
+              return (
+                <div className="text-sm text-danger">
+                  No providers configured. Add API keys to ~/.pi/agent/auth.json or set environment variables.
+                </div>
+              )
+            }
+            
+            return (
+              <select
+                value={watch("provider") ?? configuredProviders[0]?.id}
+                onChange={(e) => {
+                  const newProvider = e.target.value
+                  setValue("provider", newProvider)
+                  const providerEntry = configuredProviders.find(p => p.id === newProvider)
+                  if (providerEntry?.models[0]) setValue("model", providerEntry.models[0].id)
+                }}
+                className="form-input w-full px-3 py-2 text-sm"
+              >
+                {configuredProviders.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            )
+          })()
         ) : (
           <select disabled className="form-input w-full px-3 py-2 text-sm opacity-50">
             <option>Loading providers...</option>
@@ -242,19 +259,34 @@ export function PersonaForm({ initialData, onSubmit, isLoading }: PersonaFormPro
       <div className="space-y-1">
         <label className="block text-sm font-medium text-muted">Model</label>
         {modelsData ? (
-          <select
-            value={watch("model") ?? ""}
-            onChange={(e) => setValue("model", e.target.value)}
-            className="form-input w-full px-3 py-2 text-sm"
-          >
-            {modelsData.providers
-              .find(p => p.id === (watch("provider") ?? "anthropic"))
-              ?.models.map(m => (
-                <option key={m.id} value={m.id}>
-                  {m.name}{m.note ? ` (${m.note})` : ""}
-                </option>
-              ))}
-          </select>
+          (() => {
+            const configuredProviders = modelsData.providers.filter(p =>
+              modelsData.authMethods[p.id]?.configured
+            )
+            const currentProvider = configuredProviders.find(p => p.id === watch("provider"))
+            
+            if (!currentProvider || configuredProviders.length === 0) {
+              return (
+                <select disabled className="form-input w-full px-3 py-2 text-sm opacity-50">
+                  <option>No models available</option>
+                </select>
+              )
+            }
+            
+            return (
+              <select
+                value={watch("model") ?? ""}
+                onChange={(e) => setValue("model", e.target.value)}
+                className="form-input w-full px-3 py-2 text-sm"
+              >
+                {currentProvider.models.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}{m.note ? ` (${m.note})` : ""}
+                  </option>
+                ))}
+              </select>
+            )
+          })()
         ) : (
           <select disabled className="form-input w-full px-3 py-2 text-sm opacity-50">
             <option>Loading models...</option>

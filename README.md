@@ -2,13 +2,13 @@
   <img src="packages/client/public/assets/agent-dash-task-queue.png" alt="Dash AI" />
 </p>
 
-A self-hosted, planning-first AI kanban board for managing coding tasks across local repos. Submit a task, let an AI planner generate a spec, review and iterate on it, then approve it for coding — all from the dashboard.
+A self-hosted, planning-first AI kanban board for managing coding tasks across local repos. Submit a task, let an AI planner generate a spec, review and iterate on it, then approve it for coding — all from the dashboard or CLI.
 
 ## How it works
 
 1. **Register a project** — point the dashboard at a local repo
 2. **Create a task** — describe the work, assign a Planning Persona + Coding Persona
-3. **Start Planning** — the AI runs `start-work` + `create-plans` in your repo, producing BRIEF.md + PLAN.md files in `.planning/`
+3. **Start Planning** — the AI generates BRIEF.md + ROADMAP.md + phase plans in `.planning/`
 4. **Review the plan** — read BRIEF.md and ROADMAP.md directly in the dashboard; iterate with feedback if needed
 5. **Mark Ready to Code** — the coding queue picks it up automatically
 6. **Review the diff** — once the coding session completes, review the diff and approve or reject
@@ -17,12 +17,32 @@ A self-hosted, planning-first AI kanban board for managing coding tasks across l
 
 - **Node.js** v22+ (nvm recommended)
 - **pnpm** — `npm install -g pnpm`
-- **OpenCode** installed globally — for AI agent execution
-- **Planning skill stack** (required for Planning mode):
-  ```bash
-  npx @prillcode/start-work
-  ```
-  Installs `start-work` and `create-plans` skills to `~/.agents/skills/`
+- **Pi SDK skills** installed at `~/.agents/skills/`:
+  - `start-work-begin`
+  - `start-work-plan`
+  - `start-work-run`
+
+## Provider Configuration (API Keys)
+
+Dash AI uses the **Pi SDK** for AI provider management. API keys are loaded from:
+
+### Option 1: Pi CLI Auth Storage (Recommended)
+```bash
+# Stored in ~/.pi/agent/auth.json
+pi login                    # For OAuth providers
+pi config set-api-key       # For API key providers
+```
+
+### Option 2: Environment Variables
+```bash
+# Add to ~/.dash-ai/.env or your shell profile
+export OPENAI_API_KEY=sk-...
+export ANTHROPIC_API_KEY=sk-ant-...
+export DEEPSEEK_API_KEY=...
+# etc.
+```
+
+**Only providers with configured API keys appear in the Persona dropdown.** The provider list is filtered to show only authenticated providers from Pi SDK's `AuthStorage`.
 
 ## Quick Start
 
@@ -37,10 +57,10 @@ pnpm install
 ### 2. Configure environment
 
 ```bash
-cp .env.example .env
+cp packages/server/.env.example packages/server/.env
 ```
 
-Edit `.env`:
+Edit `packages/server/.env`:
 
 ```bash
 # Required: secret token for API auth
@@ -52,18 +72,20 @@ PORT=3000
 MAX_CONCURRENT_SESSIONS=3
 ```
 
-### 3. Configure your AI provider
+### 3. Configure your AI provider(s)
 
-On first run, `~/.dash-ai/models.json` is auto-created with defaults. Edit it to configure available models. API keys are managed via OpenCode `/connect` command or environment variables.
+**Via Pi CLI:**
+```bash
+# Set up Anthropic (Claude)
+export ANTHROPIC_API_KEY=sk-ant-...
+pi login anthropic
 
-```json
-{
-  "provider": "anthropic",
-  "apiKey": "sk-ant-...",
-  "plannerModel": "claude-opus-4-5",
-  "coderModel": "claude-sonnet-4-5"
-}
+# Or set up OpenAI
+export OPENAI_API_KEY=sk-...
+pi login openai
 ```
+
+Keys are stored in `~/.pi/agent/auth.json` and automatically detected by Dash AI.
 
 ### 4. Apply migrations
 
@@ -73,39 +95,32 @@ pnpm db:migrate
 
 Database is created at `~/.dash-ai/dashboard.db` (SQLite, local file).
 
-**Upgrading from v0.5.x?** If you have an existing `~/.ai-dashboard/` directory, move it:
-```bash
-mv ~/.ai-dashboard ~/.dash-ai
-```
-
 **Important:** never run `pnpm db:generate` — see `AGENTS.md` for migration rules.
 
 ### 5. Start development
 
+**Option A: Web + Server (development)**
 ```bash
-pnpm dev
-```
+# Terminal 1: API Server
+pnpm --filter server dev
 
+# Terminal 2: React Client
+pnpm --filter client dev
+```
 - Client: http://localhost:5173
 - Server: http://localhost:3000
 
-## Planning Workflow
-
-The planning phase runs the `start-work` + `create-plans` skill stack inside your project repo. The AI generates:
-
-```
-your-repo/.planning/
-└── <task-slug>/
-    ├── BRIEF.md       ← project vision
-    ├── ROADMAP.md     ← phased plan
-    └── phases/
-        └── 01-*/
-            └── 01-01-PLAN.md   ← executable task prompt
+**Option B: Electron Desktop App**
+```bash
+cd packages/electron
+pnpm run dev
 ```
 
-You can read BRIEF.md and ROADMAP.md directly in the dashboard on the task detail page. If the plan needs work, click **Iterate Plan**, provide feedback, and the AI re-runs planning with your notes.
-
-When you're happy with the plan, click **Mark Ready to Code** — the queue worker picks it up and runs the coding session.
+**Option C: CLI**
+```bash
+cd packages/cli
+node dist/index.js --help
+```
 
 ## Personas
 
@@ -118,13 +133,7 @@ Personas define how the AI behaves. There are four types:
 | `reviewer` | Reviews diffs | claude-sonnet-4-5 | No |
 | `custom` | Any other use | configurable | configurable |
 
-Provider and model are configurable per persona — they are selected from `~/.dash-ai/models.json` at session start.
-
-## Projects
-
-Projects register local repos by name and filesystem path. Paths support `~` (expanded at runtime). The path is validated against the filesystem when you save.
-
-Once a project is registered, it appears in the task creation form as a dropdown — no more error-prone free-text repo paths.
+**Provider and model selection** is filtered to only show providers with configured API keys. The dropdown dynamically updates based on your `~/.pi/agent/auth.json` or environment variables.
 
 ## Task State Machine
 
@@ -135,7 +144,7 @@ DRAFT → IN_PLANNING → PLANNED → READY_TO_CODE → QUEUED → RUNNING → A
 ```
 
 Manual transitions available from the dashboard:
-- **DRAFT → IN_PLANNING**: "Start Planning" button (requires Planning Persona)
+- **DRAFT → IN_PLANNING**: "Start Planning" button
 - **PLANNED → IN_PLANNING**: "Iterate Plan" (provide feedback, re-trigger AI)
 - **PLANNED → READY_TO_CODE**: "Mark Ready to Code"
 - **AWAITING_REVIEW → APPROVED/REJECTED**: review buttons on task detail
@@ -143,6 +152,15 @@ Manual transitions available from the dashboard:
 ## API Reference
 
 All endpoints require `Authorization: Bearer <API_TOKEN>` except `GET /api/models`.
+
+### Auth & Models
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/auth/status` | Overall auth status (all providers) |
+| GET | `/api/auth/provider?provider=anthropic` | Check specific provider auth |
+| POST | `/api/auth/refresh` | Trigger auth refresh/login |
+| GET | `/api/models` | Available providers + models (filtered to configured) |
 
 ### Projects
 
@@ -153,7 +171,6 @@ All endpoints require `Authorization: Bearer <API_TOKEN>` except `GET /api/model
 | GET | `/api/projects/:id` | Get project |
 | PATCH | `/api/projects/:id` | Update project |
 | DELETE | `/api/projects/:id` | Delete project |
-| GET | `/api/projects/validate-path` | Validate path (`?path=~/my-repo`) |
 
 ### Personas
 
@@ -165,7 +182,6 @@ All endpoints require `Authorization: Bearer <API_TOKEN>` except `GET /api/model
 | PUT | `/api/personas/:id` | Update persona |
 | PATCH | `/api/personas/:id/toggle` | Toggle active |
 | DELETE | `/api/personas/:id` | Soft delete |
-| GET | `/api/models` | Available providers + models (public) |
 
 ### Tasks
 
@@ -174,9 +190,11 @@ All endpoints require `Authorization: Bearer <API_TOKEN>` except `GET /api/model
 | GET | `/api/tasks` | List tasks (`?status=`, `?personaId=`) |
 | POST | `/api/tasks` | Create task |
 | GET | `/api/tasks/:id` | Get task |
-| PATCH | `/api/tasks/:id/status` | Update status manually |
-| POST | `/api/tasks/:id/start-planning` | Trigger planning (DRAFT → IN_PLANNING) |
-| POST | `/api/tasks/:id/iterate-plan` | Re-plan with feedback (PLANNED → IN_PLANNING) |
+| PATCH | `/api/tasks/:id` | Update task fields |
+| PATCH | `/api/tasks/:id/status` | Update status |
+| POST | `/api/tasks/:id/start-planning` | Trigger planning |
+| POST | `/api/tasks/:id/iterate-plan` | Re-plan with feedback |
+| POST | `/api/tasks/:id/review` | Run reviewer persona |
 | GET | `/api/tasks/:id/plan-doc` | Read plan doc (`?file=BRIEF.md`) |
 | GET | `/api/tasks/:id/diff` | Get diff file |
 
@@ -187,7 +205,43 @@ All endpoints require `Authorization: Bearer <API_TOKEN>` except `GET /api/model
 | GET | `/api/tasks/:taskId/events` | List task events |
 | WS | `/ws/tasks/:taskId/stream` | Real-time event stream |
 
-## Deployment (PM2)
+## CLI Usage
+
+```bash
+# List tasks
+dash-ai tasks list
+
+# Create and auto-plan a task
+dash-ai tasks create \
+  --project my-app \
+  --title "Add rate limiting" \
+  --description "Add middleware with 100 req/min per IP" \
+  --planner "Planner" \
+  --coder "Coder" \
+  --auto-plan
+
+# Watch progress
+dash-ai tasks watch <task-id>
+
+# View plan
+dash-ai tasks plan-docs <task-id> --file BRIEF.md
+
+# Approve and code
+dash-ai tasks approve-plan <task-id>
+dash-ai tasks wait <task-id> --status AWAITING_REVIEW
+```
+
+See `packages/cli/AGENT-USAGE.md` for complete CLI reference.
+
+## Deployment
+
+### Production Build
+
+```bash
+pnpm build
+```
+
+### PM2
 
 ```bash
 pnpm build
@@ -196,14 +250,11 @@ pm2 save
 pm2 startup  # auto-start on system boot
 ```
 
-To update:
+### Electron Packaging
 
 ```bash
-git pull origin main
-pnpm install
-pnpm db:migrate
-pnpm build
-pm2 restart dash-ai
+cd packages/electron
+pnpm run dist:linux    # or dist:mac, dist:win
 ```
 
 ## Tech Stack
@@ -215,11 +266,12 @@ pm2 restart dash-ai
 | Backend | Hono + `@hono/node-server` |
 | Database | SQLite (`better-sqlite3`) + Drizzle ORM |
 | Frontend | React 18 + TypeScript + Vite |
-| Styling | Tailwind CSS v4 |
+| Styling | Tailwind CSS |
 | Data fetching | TanStack Query v5 |
 | Forms | React Hook Form + Zod |
 | Routing | React Router v6 |
-| AI execution | OpenCode SDK (`@opencode-ai/sdk`) |
+| AI execution | Pi SDK (`@mariozechner/pi-coding-agent`) |
+| Desktop | Electron |
 
 ## License
 

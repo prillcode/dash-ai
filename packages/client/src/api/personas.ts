@@ -80,7 +80,10 @@ export function useModels() {
   return useQuery({
     queryKey: ["models"],
     queryFn: () =>
-      apiClient<{ providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; note?: string }> }> }>("/api/models"),
+      apiClient<{
+        providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; note?: string }> }>
+        authMethods: Record<string, { type: string; configured: boolean }>
+      }>("/api/models"),
     staleTime: 60_000, // 1 minute
   })
 }
