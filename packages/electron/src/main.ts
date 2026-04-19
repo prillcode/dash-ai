@@ -63,8 +63,6 @@ function startStaticServer(apiPort: number, apiToken: string): Promise<number> {
           headers['Authorization'] = `Bearer ${apiToken}`
         }
         
-        console.log(`[proxy] ${req.method} ${url} -> ${apiPort}`)
-        
         const options = {
           hostname: "127.0.0.1",
           port: apiPort,
@@ -74,7 +72,6 @@ function startStaticServer(apiPort: number, apiToken: string): Promise<number> {
         }
         
         const proxyReq = require("http").request(options, (proxyRes: any) => {
-          console.log(`[proxy] Response: ${proxyRes.statusCode} for ${url}`)
           res.writeHead(proxyRes.statusCode, proxyRes.headers)
           proxyRes.pipe(res)
         })
@@ -118,7 +115,6 @@ function startStaticServer(apiPort: number, apiToken: string): Promise<number> {
       const addr = staticServer?.address()
       if (addr && typeof addr === "object") {
         staticServerPort = addr.port
-        console.log("[static] Client server running on http://127.0.0.1:" + staticServerPort)
         resolve(staticServerPort)
       } else {
         reject(new Error("Failed to get server port"))
@@ -164,8 +160,7 @@ async function startEmbeddedServer(): Promise<{ url: string; token: string }> {
 
     const onData = (data: Buffer) => {
       const line = data.toString()
-      console.log("[server]", line.trim())
-
+      
       // Parse "Dash AI server running on http://localhost:PORT"
       const match = line.match(/running on (http:\/\/localhost:\d+)/)
       if (match) {
@@ -178,7 +173,10 @@ async function startEmbeddedServer(): Promise<{ url: string; token: string }> {
 
     serverProcess?.stdout?.on("data", onData)
     serverProcess?.stderr?.on("data", (data) => {
-      console.error("[server err]", data.toString().trim())
+      // Server logs to stderr - suppress in production
+      if (process.env.DEBUG) {
+        console.error("[server]", data.toString().trim())
+      }
     })
 
     serverProcess?.on("error", (err) => {
@@ -186,10 +184,8 @@ async function startEmbeddedServer(): Promise<{ url: string; token: string }> {
       reject(err)
     })
 
-    serverProcess?.on("exit", (code) => {
-      if (code !== 0 && code !== null) {
-        console.error(`Server exited with code ${code}`)
-      }
+    serverProcess?.on("exit", () => {
+      // Server exited
     })
   })
 }
@@ -224,20 +220,16 @@ function createWindow(clientPort: number) {
 
   // Load the React app from local static server
   const loadUrl = process.env.VITE_DEV_SERVER_URL || `http://127.0.0.1:${clientPort}`
-  console.log("[electron] Loading URL:", loadUrl)
-  
   mainWindow.loadURL(loadUrl)
   
-  // Open DevTools for debugging
-  mainWindow.webContents.openDevTools()
+  // Open DevTools for debugging (disable in production)
+  if (process.env.NODE_ENV === "development" || process.env.DEBUG) {
+    mainWindow.webContents.openDevTools()
+  }
   
-  // Log any load errors
-  mainWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription) => {
-    console.error("[electron] Failed to load:", errorCode, errorDescription)
-  })
-  
-  mainWindow.webContents.on("dom-ready", () => {
-    console.log("[electron] DOM ready")
+  // Log load errors for debugging
+  mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription) => {
+    console.error("Failed to load:", errorCode, errorDescription)
   })
 
   mainWindow.on("closed", () => {
@@ -261,8 +253,6 @@ app.whenReady().then(async () => {
     // Start the API server first to get its port and token
     const { url: apiUrl } = await startEmbeddedServer()
     const apiPort = parseInt(new URL(apiUrl).port, 10)
-    console.log("[electron] API server on port:", apiPort)
-    console.log("[electron] API token:", serverToken?.slice(0, 8) + "...")
     
     // Start static server with API proxy (pass the token)
     const clientPort = await startStaticServer(apiPort, serverToken!)
