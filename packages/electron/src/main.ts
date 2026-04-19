@@ -32,7 +32,7 @@ function generateToken(): string {
 }
 
 // Start a simple HTTP server to serve the React client static files
-function startStaticServer(apiPort: number): Promise<number> {
+function startStaticServer(apiPort: number, apiToken: string): Promise<number> {
   return new Promise((resolve, reject) => {
     const clientDist = join(__dirname, "../../client/dist")
     
@@ -41,12 +41,19 @@ function startStaticServer(apiPort: number): Promise<number> {
       
       // Proxy API requests to the API server
       if (url.startsWith("/api/") || url.startsWith("/ws/")) {
+        const headers = { ...req.headers }
+        
+        // Add Authorization header if not present
+        if (!headers.authorization && apiToken) {
+          headers.authorization = `Bearer ${apiToken}`
+        }
+        
         const options = {
           hostname: "127.0.0.1",
           port: apiPort,
           path: url,
           method: req.method,
-          headers: req.headers,
+          headers,
         }
         
         const proxyReq = require("http").request(options, (proxyRes: any) => {
@@ -230,13 +237,14 @@ ipcMain.handle("server:stop", async () => {
 // App lifecycle
 app.whenReady().then(async () => {
   try {
-    // Start the API server first to get its port
+    // Start the API server first to get its port and token
     const { url: apiUrl } = await startEmbeddedServer()
     const apiPort = parseInt(new URL(apiUrl).port, 10)
     console.log("[electron] API server on port:", apiPort)
+    console.log("[electron] API token:", serverToken?.slice(0, 8) + "...")
     
-    // Start static server with API proxy
-    const clientPort = await startStaticServer(apiPort)
+    // Start static server with API proxy (pass the token)
+    const clientPort = await startStaticServer(apiPort, serverToken!)
     
     // Create window after both servers are ready
     createWindow(clientPort)
