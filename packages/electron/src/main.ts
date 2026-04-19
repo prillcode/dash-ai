@@ -10,6 +10,12 @@ import { lookup } from "mime-types"
 app.commandLine.appendSwitch("disable-gpu")
 app.commandLine.appendSwitch("disable-software-rasterizer")
 app.commandLine.appendSwitch("no-sandbox")
+app.commandLine.appendSwitch("disable-dev-shm-usage")
+app.commandLine.appendSwitch("no-zygote")
+app.commandLine.appendSwitch("in-process-gpu")
+app.commandLine.appendSwitch("disable-features", "IsolateOrigins,site-per-process")
+app.commandLine.appendSwitch("disable-site-isolation-trials")
+app.commandLine.appendSwitch("max-old-space-size", "4096")
 
 // Keep a global reference of the window object
 let mainWindow: BrowserWindow | null = null
@@ -26,12 +32,39 @@ function generateToken(): string {
 }
 
 // Start a simple HTTP server to serve the React client static files
-function startStaticServer(): Promise<number> {
+function startStaticServer(apiPort: number): Promise<number> {
   return new Promise((resolve, reject) => {
     const clientDist = join(__dirname, "../../client/dist")
     
     staticServer = createServer((req, res) => {
-      let pathname = req.url || "/"
+      const url = req.url || "/"
+      
+      // Proxy API requests to the API server
+      if (url.startsWith("/api/") || url.startsWith("/ws/")) {
+        const options = {
+          hostname: "127.0.0.1",
+          port: apiPort,
+          path: url,
+          method: req.method,
+          headers: req.headers,
+        }
+        
+        const proxyReq = require("http").request(options, (proxyRes: any) => {
+          res.writeHead(proxyRes.statusCode, proxyRes.headers)
+          proxyRes.pipe(res)
+        })
+        
+        proxyReq.on("error", (err: Error) => {
+          console.error("[proxy] Error:", err.message)
+          res.writeHead(502)
+          res.end("Bad Gateway")
+        })
+        
+        req.pipe(proxyReq)
+        return
+      }
+      
+      let pathname = url
       if (pathname === "/") pathname = "/index.html"
       
       const filePath = join(clientDist, pathname)
@@ -162,13 +195,22 @@ function createWindow(clientPort: number) {
   })
 
   // Load the React app from local static server
-  if (process.env.VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL)
-    mainWindow.webContents.openDevTools()
-  } else {
-    // Load from our static file server
-    mainWindow.loadURL(`http://127.0.0.1:${clientPort}`)
-  }
+  const loadUrl = process.env.VITE_DEV_SERVER_URL || `http://127.0.0.1:${clientPort}`
+  console.log("[electron] Loading URL:", loadUrl)
+  
+  mainWindow.loadURL(loadUrl)
+  
+  // Open DevTools for debugging
+  mainWindow.webContents.openDevTools()
+  
+  // Log any load errors
+  mainWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription) => {
+    console.error("[electron] Failed to load:", errorCode, errorDescription)
+  })
+  
+  mainWindow.webContents.on("dom-ready", () => {
+    console.log("[electron] DOM ready")
+  })
 
   mainWindow.on("closed", () => {
     mainWindow = null
@@ -187,12 +229,14 @@ ipcMain.handle("server:stop", async () => {
 
 // App lifecycle
 app.whenReady().then(async () => {
-  // Start the static file server first
   try {
-    const clientPort = await startStaticServer()
+    // Start the API server first to get its port
+    const { url: apiUrl } = await startEmbeddedServer()
+    const apiPort = parseInt(new URL(apiUrl).port, 10)
+    console.log("[electron] API server on port:", apiPort)
     
-    // Start the API server
-    await startEmbeddedServer()
+    // Start static server with API proxy
+    const clientPort = await startStaticServer(apiPort)
     
     // Create window after both servers are ready
     createWindow(clientPort)
