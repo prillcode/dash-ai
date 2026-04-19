@@ -3,6 +3,7 @@ import { z } from "zod"
 import { spawn } from "child_process"
 import { join } from "path"
 import { homedir } from "os"
+import { existsSync } from "fs"
 import { checkProviderAuth, getModelRegistry } from "../agent/piSession"
 
 export const authRouter = new Hono()
@@ -80,6 +81,15 @@ authRouter.post("/refresh", async (c) => {
 
   // OAuth providers — spawn pi login
   const piBin = join(homedir(), ".pi", "bin", "pi")
+
+  // Check if pi binary exists
+  if (!existsSync(piBin)) {
+    return c.json({
+      ok: false,
+      method: "oauth",
+      message: `Pi CLI not found at ${piBin}. Install it first: curl -fsSL https://pi.codes/install | sh`,
+    }, 500)
+  }
 
   try {
     // Spawn detached so the process outlives the HTTP request
