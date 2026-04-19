@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from "electron"
+import { app, BrowserWindow, ipcMain, Menu } from "electron"
 import { spawn } from "child_process"
 import { join } from "path"
 import { homedir } from "os"
@@ -218,6 +218,9 @@ function createWindow(clientPort: number) {
     },
     titleBarStyle: "hiddenInset",
   })
+
+  // Remove the menu bar (File, Edit, View, etc.)
+  Menu.setApplicationMenu(null)
 
   // Load the React app from local static server
   const loadUrl = process.env.VITE_DEV_SERVER_URL || `http://127.0.0.1:${clientPort}`
