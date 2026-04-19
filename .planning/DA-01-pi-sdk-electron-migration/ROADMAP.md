@@ -42,7 +42,7 @@
 
 ## Phase 03 — Frontend Event Streaming *(post-DA-02)*
 **Objective:** Update the React UI to consume structured Pi SDK events
-**Status:** 📋 Deferred until DA-02 complete
+**Status:** ✅ Complete
 **Outputs:**
 - WebSocket events replaced with richer Pi event types (`tool_execution_start/end`, `message_update`, `turn_start/end`)
 - Task timeline panel shows real-time agent activity: which tools are running, their output, thinking blocks

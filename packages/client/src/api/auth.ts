@@ -23,7 +23,7 @@ export function useAuthStatus(provider: string | null | undefined, enabled = tru
     queryKey: ["auth-status", provider],
     queryFn: () =>
       apiClient<AuthStatusResult>(
-        `/api/auth/status?provider=${encodeURIComponent(provider!)}`
+        `/api/auth/provider?provider=${encodeURIComponent(provider!)}`
       ),
     enabled: enabled && !!provider,
     staleTime: 60_000,
