@@ -143,6 +143,9 @@ async function startEmbeddedServer(): Promise<{ url: string; token: string }> {
     NODE_ENV: "production",
   }
 
+  console.log("[electron] Starting API server...")
+  console.log("[electron] Using token:", token.slice(0, 8) + "...")
+  
   serverProcess = spawn(
     tsxBin,
     [serverSrc],
@@ -151,6 +154,11 @@ async function startEmbeddedServer(): Promise<{ url: string; token: string }> {
       stdio: ["ignore", "pipe", "pipe"],
     }
   )
+  
+  // Log process events for debugging
+  serverProcess.on("spawn", () => {
+    console.log("[electron] API server process started (PID:", serverProcess?.pid, ")")
+  })
 
   // Capture server URL from stdout
   return new Promise((resolve, reject) => {
@@ -173,9 +181,10 @@ async function startEmbeddedServer(): Promise<{ url: string; token: string }> {
 
     serverProcess?.stdout?.on("data", onData)
     serverProcess?.stderr?.on("data", (data) => {
-      // Server logs to stderr - suppress in production
-      if (process.env.DEBUG) {
-        console.error("[server]", data.toString().trim())
+      const line = data.toString().trim()
+      // Log errors and important messages
+      if (line.includes("Error") || line.includes("error") || line.includes("FATAL")) {
+        console.error("[server ERROR]", line)
       }
     })
 
@@ -184,8 +193,10 @@ async function startEmbeddedServer(): Promise<{ url: string; token: string }> {
       reject(err)
     })
 
-    serverProcess?.on("exit", () => {
-      // Server exited
+    serverProcess?.on("exit", (code) => {
+      if (code !== 0 && code !== null) {
+        console.error(`[electron] API server exited with code ${code}`)
+      }
     })
   })
 }
