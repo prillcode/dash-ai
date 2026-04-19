@@ -1,6 +1,7 @@
 import { Hono } from "hono"
 import { z } from "zod"
 import * as personaService from "../services/personaService"
+import { validatePersonaModel } from "../agent/piSession"
 
 export const personasRouter = new Hono()
 
@@ -27,47 +28,69 @@ personasRouter.get("/", async (c) => {
 personasRouter.post("/", async (c) => {
   const body = await c.req.json()
   const parsed = personaSchema.safeParse(body)
-  
+
   if (!parsed.success) {
     return c.json({ error: "Validation failed", details: parsed.error.issues }, 400)
   }
-  
+
+  // Model validation — advisory, does not block save
+  const validation = validatePersonaModel({
+    provider: parsed.data.provider,
+    model: parsed.data.model,
+  })
+
   const persona = await personaService.createPersona(parsed.data)
-  return c.json(persona, 201)
+
+  return c.json({
+    ...persona,
+    _meta: {
+      modelValid: validation.valid,
+      modelWarning: validation.valid ? undefined : validation.message,
+      modelSuggestion: validation.valid ? undefined : validation.suggestion,
+    },
+  }, 201)
 })
 
 personasRouter.get("/:id", async (c) => {
   const id = c.req.param("id")
-  console.log('GET /api/personas/:id', id)
   const persona = await personaService.getPersona(id)
-  
+
   if (!persona) {
     return c.json({ error: "Persona not found" }, 404)
   }
-  
-  console.log('Returning persona:', persona.personaType, persona.provider, persona.model)
+
   return c.json(persona)
 })
 
 personasRouter.put("/:id", async (c) => {
   const id = c.req.param("id")
   const body = await c.req.json()
-  console.log('PUT /api/personas/:id body:', body)
   const parsed = personaUpdateSchema.safeParse(body)
-  
+
   if (!parsed.success) {
-    console.log('Validation failed:', parsed.error.issues)
     return c.json({ error: "Validation failed", details: parsed.error.issues }, 400)
   }
-  
-  console.log('Parsed data:', parsed.data)
+
+  // Model validation — advisory, does not block save
+  const validation = validatePersonaModel({
+    provider: parsed.data.provider,
+    model: parsed.data.model,
+  })
+
   const persona = await personaService.updatePersona(id, parsed.data)
-  
+
   if (!persona) {
     return c.json({ error: "Persona not found" }, 404)
   }
-  
-  return c.json(persona)
+
+  return c.json({
+    ...persona,
+    _meta: {
+      modelValid: validation.valid,
+      modelWarning: validation.valid ? undefined : validation.message,
+      modelSuggestion: validation.valid ? undefined : validation.suggestion,
+    },
+  })
 })
 
 personasRouter.patch("/:id/toggle", async (c) => {

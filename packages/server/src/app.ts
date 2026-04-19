@@ -1,0 +1,100 @@
+import "./env"
+import { Hono } from "hono"
+import { cors } from "hono/cors"
+import { logger } from "hono/logger"
+import { serveStatic } from "@hono/node-server/serve-static"
+import { readFileSync, existsSync } from "fs"
+import { join } from "path"
+import { homedir } from "os"
+import { personasRouter } from "./routes/personas"
+import { tasksRouter } from "./routes/tasks"
+import { eventsRouter } from "./routes/events"
+import { modelsRouter } from "./routes/models"
+import { projectsRouter } from "./routes/projects"
+import { authRouter } from "./routes/auth"
+import { authMiddleware } from "./middleware/auth"
+import { loggerMiddleware } from "./middleware/logger"
+import { getModelRegistry } from "./agent/piSession"
+
+export interface AppOptions {
+  /** Path to the client dist directory (for serving the React UI). */
+  clientDistPath?: string
+  /** Skip pi-native skills and SDK initialization checks (for testing/embedded). */
+  skipStartupChecks?: boolean
+}
+
+/**
+ * Create the shared Hono app with all middleware and routes registered.
+ * Used by both the standalone server entry point and the embedded CLI server.
+ */
+export function createApp(options: AppOptions = {}): Hono {
+  const {
+    clientDistPath,
+    skipStartupChecks = false,
+  } = options
+
+  const app = new Hono()
+  const distPath = clientDistPath ?? join(process.cwd(), "../client/dist")
+
+  app.use("*", cors())
+  app.use("*", logger())
+  app.use("*", loggerMiddleware)
+
+  app.get("/api/health", (c) => c.json({ status: "ok" }))
+  app.route("/api/models", modelsRouter)
+
+  app.use("/api/*", authMiddleware)
+
+  app.route("/api/personas", personasRouter)
+  app.route("/api/tasks", tasksRouter)
+  app.route("/api/tasks/:taskId/events", eventsRouter)
+  app.route("/api/projects", projectsRouter)
+  app.route("/api/auth", authRouter)
+
+  app.use("/*", serveStatic({ root: distPath }))
+
+  app.notFound((c) => {
+    const indexPath = join(distPath, "index.html")
+    if (existsSync(indexPath)) {
+      return c.html(readFileSync(indexPath, "utf-8"))
+    }
+    return c.html("<html><body><h1>Dash AI</h1><p>Frontend not built</p></body></html>")
+  })
+
+  if (!skipStartupChecks) {
+    runStartupChecks()
+  }
+
+  return app
+}
+
+/**
+ * Print startup warnings about missing skills and unconfigured models.
+ * Safe to call once per process — not called automatically in embedded/CLI mode.
+ */
+export function runStartupChecks(): void {
+  const requiredSkills = ["start-work-begin", "start-work-plan", "start-work-run"]
+  const missing = requiredSkills.filter(
+    (s) => !existsSync(join(homedir(), ".agents", "skills", s))
+  )
+  if (missing.length > 0) {
+    console.warn(`⚠️  Missing pi-native skills: ${missing.join(", ")}`)
+    console.warn("    Planning and coding tasks will fail until skills are installed.")
+    console.warn("    Expected location: ~/.agents/skills/")
+  }
+
+  try {
+    const registry = getModelRegistry()
+    const available = registry.getAvailable()
+    if (available.length === 0) {
+      console.warn("⚠️  No AI models available. Configure API keys:")
+      console.warn("    - Set ANTHROPIC_API_KEY, OPENAI_API_KEY, etc. env vars")
+      console.warn("    - Or run: pi /login")
+    } else {
+      const providers = [...new Set(available.map(m => m.provider))]
+      console.log(`Pi SDK initialized: ${available.length} models available from ${providers.join(", ")}`)
+    }
+  } catch (err: any) {
+    console.warn(`⚠️  Pi SDK initialization warning: ${err.message}`)
+  }
+}

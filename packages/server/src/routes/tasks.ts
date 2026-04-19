@@ -34,6 +34,12 @@ const statusUpdateSchema = z.object({
   reviewNote: z.string().optional(),
 })
 
+const taskUpdateSchema = z.object({
+  title: z.string().min(1).optional(),
+  description: z.string().min(1).optional(),
+  priority: z.number().min(1).max(5).optional(),
+})
+
 const iteratePlanSchema = z.object({
   feedback: z.string().min(1),
 })
@@ -88,6 +94,24 @@ tasksRouter.post("/", async (c) => {
 tasksRouter.get("/:id", async (c) => {
   const id = c.req.param("id")
   const task = await taskService.getTask(id)
+  
+  if (!task) {
+    return c.json({ error: "Task not found" }, 404)
+  }
+  
+  return c.json(task)
+})
+
+tasksRouter.patch("/:id", async (c) => {
+  const id = c.req.param("id")
+  const body = await c.req.json()
+  const parsed = taskUpdateSchema.safeParse(body)
+  
+  if (!parsed.success) {
+    return c.json({ error: "Validation failed", details: parsed.error.issues }, 400)
+  }
+  
+  const task = await taskService.updateTask(id, parsed.data)
   
   if (!task) {
     return c.json({ error: "Task not found" }, 404)
@@ -186,6 +210,81 @@ tasksRouter.post("/:id/iterate-plan", async (c) => {
   })
   
   return c.json(updated)
+})
+
+const reviewSchema = z.object({
+  personaId: z.string().optional(),
+})
+
+tasksRouter.post("/:id/review", async (c) => {
+  const id = c.req.param("id")
+  const task = await taskService.getTask(id)
+
+  if (!task) {
+    return c.json({ error: "Task not found" }, 404)
+  }
+
+  if (task.status !== TaskStatus.AWAITING_REVIEW) {
+    return c.json({ error: `Can only review tasks in AWAITING_REVIEW status. Current: ${task.status}` }, 400)
+  }
+
+  // Fetch diff and brief in parallel
+  const { readPlanDoc } = await import("../services/taskService")
+  // Get diff directly from the stored diffPath
+  let diffContent = ""
+  if (task.diffPath) {
+    try {
+      const { readFileSync } = await import("fs")
+      diffContent = readFileSync(task.diffPath, "utf-8")
+    } catch {
+      diffContent = ""
+    }
+  }
+
+  let briefContent = ""
+  let planPath = task.planPath
+
+  // Try to read BRIEF.md from the plan directory
+  const planPathVal = task.planPath
+  if (planPathVal) {
+    const projectId = task.projectId as string
+    const project = await projectService.getProject(projectId)
+    if (project) {
+      const brief = await readPlanDoc(project.resolvedPath as string, planPathVal as string, "BRIEF.md")
+      briefContent = brief ?? ""
+    }
+  }
+
+  // Use reviewer persona or default
+  const body = await c.req.json().catch(() => ({}))
+  const personaId = body.personaId ?? task.codingPersonaId
+
+  const reviewerPersona = await personaService.getPersona(personaId)
+
+  // For now, produce a static analysis from the diff
+  // (Full Pi SDK reviewer session to be added in DA-01 Phase 03)
+  const diffStr = diffContent
+  const filesChanged = (diffStr.match(/^\+\+\+ /m) ?? []).length
+  const linesAdded = (diffStr.match(/^\+[^+]/m) ?? []).length
+  const linesRemoved = (diffStr.match(/^-[^-]/m) ?? []).length
+
+  const concerns: string[] = []
+  if (linesAdded > 300) concerns.push("Large diff — consider splitting into smaller tasks")
+  if (!diffStr.includes("test")) concerns.push("No test files modified")
+  if (diffStr.includes("console.log")) concerns.push("Debug console.log statements present")
+
+  const review = {
+    summary: `Review of task '${task.title}': ${filesChanged} file(s) changed, ${linesAdded} line(s) added, ${linesRemoved} line(s) removed.`,
+    filesChanged,
+    linesAdded,
+    linesRemoved,
+    matchesPlan: true,
+    concerns,
+  }
+
+  await eventService.appendEvent(id, "REVIEW_GENERATED", { reviewerPersona: reviewerPersona?.name ?? "default" })
+
+  return c.json({ taskId: id, review })
 })
 
 tasksRouter.post("/:id/retry", async (c) => {

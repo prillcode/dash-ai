@@ -64,38 +64,49 @@ export async function listPersonas(activeOnly = true): Promise<ParsedPersona[]> 
 
 export async function getPersona(id: string): Promise<ParsedPersona | null> {
   const [row] = await db.select().from(personas).where(eq(personas.id, id))
-  console.log('getPersona row:', row?.personaType, row?.provider, row?.model)
-  const parsed = row ? parsePersona(row) : null
-  console.log('getPersona parsed:', parsed?.personaType, parsed?.provider, parsed?.model)
-  return parsed
+  return row ? parsePersona(row) : null
 }
 
 export async function createPersona(input: PersonaInput): Promise<ParsedPersona> {
   const id = generateId()
   const timestamp = now()
   const serialized = serializePersona(input)
-  
+
+  // Support "provider/model" shorthand in the model field
+  let model = input.model || "claude-sonnet-4-5"
+  let provider = input.provider || "anthropic"
+  if (model.includes("/")) {
+    const [prov, mod] = model.split("/")
+    provider = prov
+    model = mod
+  }
+
   const [row] = await db.insert(personas).values({
     id,
     name: input.name,
     description: input.description || "",
     personaType: input.personaType || "custom",
     systemPrompt: input.systemPrompt,
-    model: input.model || "claude-sonnet-4-5",
-    provider: input.provider || "anthropic",
+    model,
+    provider,
     allowedTools: serialized.allowedTools,
     contextFiles: serialized.contextFiles,
     tags: serialized.tags,
     isActive: true,
     createdAt: timestamp,
     updatedAt: timestamp,
-  } as NewPersona).returning()
-  
+  }).returning()
+
   return parsePersona(row)
 }
 
 export async function updatePersona(id: string, input: Partial<PersonaInput>): Promise<ParsedPersona | null> {
-  console.log('updatePersona called:', id, input)
+  // Support "provider/model" shorthand in the model field
+  if (input.model?.includes("/")) {
+    const [prov, mod] = input.model.split("/")
+    input = { ...input, provider: prov, model: mod }
+  }
+
   const serialized = input.allowedTools || input.contextFiles || input.tags
     ? {
         allowedTools: JSON.stringify(input.allowedTools || []),
@@ -103,18 +114,21 @@ export async function updatePersona(id: string, input: Partial<PersonaInput>): P
         tags: JSON.stringify(input.tags || []),
       }
     : {}
-  console.log('serialized:', serialized)
-  
+
   const [row] = await db.update(personas)
     .set({
-      ...input,
+      name: input.name,
+      description: input.description,
+      personaType: input.personaType,
+      systemPrompt: input.systemPrompt,
+      model: input.model,
+      provider: input.provider,
       ...serialized,
       updatedAt: now(),
-    } as Partial<PersonaRow>)
+    })
     .where(eq(personas.id, id))
     .returning()
-  
-  console.log('update result row:', row)
+
   return row ? parsePersona(row) : null
 }
 

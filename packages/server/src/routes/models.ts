@@ -1,65 +1,109 @@
 import { Hono } from "hono"
-import { existsSync, readFileSync } from "fs"
-import { join } from "path"
-import os from "os"
+import { getModelRegistry, getAuth } from "../agent/piSession"
+import type { Model, Api } from "@mariozechner/pi-ai"
 
 export const modelsRouter = new Hono()
 
-const DEFAULT_MODELS = {
-  providers: [
-    {
-      id: "anthropic",
-      name: "Anthropic",
-       models: [
-         { id: "claude-opus-4-5", name: "Claude Opus 4.5", note: "best for planning" },
-         { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", note: "best for coding" },
-         { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", note: "latest Sonnet model" },
-         { id: "claude-haiku-3-5", name: "Claude Haiku 3.5", note: "fast + cheap" },
-       ],
-    },
-    {
-      id: "openai",
-      name: "OpenAI",
-      models: [
-        { id: "o3", name: "o3", note: "best for planning" },
-        { id: "gpt-4o", name: "GPT-4o", note: "fast + capable" },
-      ],
-    },
-    {
-      id: "deepseek",
-      name: "DeepSeek",
-      models: [
-        { id: "deepseek-reasoner", name: "DeepSeek Reasoner", note: "strong reasoning model" },
-        { id: "deepseek-chat", name: "DeepSeek Chat", note: "general coding model" },
-      ],
-    },
-    {
-      id: "zai",
-      name: "Z.AI",
-      models: [
-        { id: "glm-4.7", name: "GLM 4.7", note: "Coding Plan model" },
-      ],
-    },
-    {
-      id: "ollama",
-      name: "Ollama (local)",
-      models: [
-        { id: "qwen2.5-coder:32b", name: "Qwen 2.5 Coder 32B", note: "strong local coding model" },
-        { id: "llama3.3:70b", name: "Llama 3.3 70B", note: "strong local general model" },
-      ],
-    },
-  ],
+// Known provider display metadata
+const PROVIDER_META: Record<string, { name: string; note?: string }> = {
+  anthropic: { name: "Anthropic" },
+  openai: { name: "OpenAI" },
+  deepseek: { name: "DeepSeek" },
+  google: { name: "Google" },
+  "google-vertex": { name: "Google Vertex" },
+  mistral: { name: "Mistral" },
+  groq: { name: "Groq" },
+  openrouter: { name: "OpenRouter" },
+  zai: { name: "Z.AI" },
+  ollama: { name: "Ollama (local)" },
+  cerebras: { name: "Cerebras" },
+  xai: { name: "xAI" },
 }
 
-modelsRouter.get("/", (c) => {
-  const modelsPath = join(os.homedir(), ".dash-ai", "models.json")
-  if (existsSync(modelsPath)) {
-    try {
-      const content = readFileSync(modelsPath, "utf-8")
-      return c.json(JSON.parse(content))
-    } catch {
-      // Fall through to default
+interface ModelResponse {
+  id: string
+  name: string
+  reasoning: boolean
+  contextWindow: number
+  maxTokens: number
+  input: ("text" | "image")[]
+  available: boolean
+  cost: { input: number; output: number; cacheRead: number; cacheWrite: number }
+}
+
+interface ProviderResponse {
+  id: string
+  name: string
+  models: ModelResponse[]
+}
+
+modelsRouter.get("/", async (c) => {
+  try {
+    const registry = getModelRegistry()
+    const auth = getAuth()
+
+    const allModels = registry.getAll()
+    const available = registry.getAvailable()
+    const availableKeys = new Set(available.map(m => `${m.provider}/${m.id}`))
+
+    // Group all models by provider
+    const byProvider = new Map<string, Model<Api>[]>()
+    for (const model of allModels) {
+      const existing = byProvider.get(model.provider) ?? []
+      existing.push(model)
+      byProvider.set(model.provider, existing)
     }
+
+    const providers: ProviderResponse[] = []
+    for (const [provider, models] of byProvider) {
+      const meta = PROVIDER_META[provider] ?? { name: provider }
+      const modelResponses: ModelResponse[] = models.map(m => ({
+        id: m.id,
+        name: m.name,
+        reasoning: m.reasoning ?? false,
+        contextWindow: m.contextWindow,
+        maxTokens: m.maxTokens,
+        input: m.input,
+        available: availableKeys.has(`${m.provider}/${m.id}`),
+        cost: m.cost,
+      }))
+      providers.push({ id: provider, name: meta.name, models: modelResponses })
+    }
+
+    // Sort providers: known ones first, then alphabetical
+    const knownOrder = Object.keys(PROVIDER_META)
+    providers.sort((a, b) => {
+      const aIdx = knownOrder.indexOf(a.id)
+      const bIdx = knownOrder.indexOf(b.id)
+      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx
+      if (aIdx !== -1) return -1
+      if (bIdx !== -1) return 1
+      return a.name.localeCompare(b.name)
+    })
+
+    // Auth methods per provider
+    const authMethods: Record<string, { type: string; configured: boolean }> = {}
+    const allProviders = [...new Set(allModels.map(m => m.provider))]
+    for (const p of allProviders) {
+      const hasAuth = auth.hasAuth(p)
+      // Determine auth type heuristically
+      const envVarMap: Record<string, string> = {
+        anthropic: "ANTHROPIC_API_KEY",
+        openai: "OPENAI_API_KEY",
+        deepseek: "DEEPSEEK_API_KEY",
+        google: "GOOGLE_API_KEY",
+        mistral: "MISTRAL_API_KEY",
+        groq: "GROQ_API_KEY",
+        zai: "ZAI_API_KEY",
+        cerebras: "CEREBRAS_API_KEY",
+        xai: "XAI_API_KEY",
+      }
+      const envVar = envVarMap[p] ?? `${p.toUpperCase()}_API_KEY`
+      authMethods[p] = { type: hasAuth ? "configured" : "env_var", configured: hasAuth }
+    }
+
+    return c.json({ providers, authMethods })
+  } catch (err: any) {
+    return c.json({ providers: [], authMethods: {}, error: err.message }, 500)
   }
-  return c.json(DEFAULT_MODELS)
 })

@@ -188,6 +188,18 @@ export async function markTaskFailed(id: string, errorMessage: string): Promise<
   return row ? parseTask(row) : null
 }
 
+export async function updateTask(
+  id: string,
+  input: { title?: string; description?: string; priority?: number }
+): Promise<Task | null> {
+  const [row] = await db.update(tasks)
+    .set({ ...input, updatedAt: now() })
+    .where(eq(tasks.id, id))
+    .returning()
+
+  return row ? parseTask(row) : null
+}
+
 export async function updateTaskDiffPath(id: string, diffPath: string): Promise<Task | null> {
   const [row] = await db.update(tasks)
     .set({ diffPath, updatedAt: now() })

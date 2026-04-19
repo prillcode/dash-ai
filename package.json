@@ -7,5 +7,9 @@
     "build": "pnpm -r build",
     "db:generate": "pnpm --filter server db:generate",
     "db:migrate": "pnpm --filter server db:migrate"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0",
+    "tsup": "^8.5.1"
   }
 }

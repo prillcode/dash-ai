@@ -2,11 +2,11 @@ import * as taskService from "../services/taskService"
 import * as personaService from "../services/personaService"
 import * as eventService from "../services/eventService"
 import { TaskStatus } from "../db/schema"
-import { runSession } from "../opencode/sessionRunner"
-import { runPlanningSession } from "../opencode/planningRunner"
+import { runCodingSession } from "../agent/codingRunner"
+import { runPlanningSession } from "../agent/planningRunner"
 import type { EventType } from "./eventService"
 
-const maxConcurrent = parseInt(process.env.MAX_CONCURRENT_SESSIONS || "3", 10)
+const maxConcurrent = parseInt(process.env.MAX_CONCURRENT_SESSIONS || "2", 10)
 let activeCount = 0
 
 function sleep(ms: number): Promise<void> {
@@ -23,9 +23,25 @@ async function runTaskSession(task: { id: string; title: string; description: st
   try {
     await taskService.updateTaskStatus(task.id, TaskStatus.RUNNING, { startedAt: new Date().toISOString() })
 
-    const result = await runSession(
-      { id: task.id, title: task.title, description: task.description, repoPath: task.repoPath, planPath: task.planPath },
-      persona
+    const result = await runCodingSession(
+      {
+        taskId: task.id,
+        taskTitle: task.title,
+        taskDescription: task.description,
+        repoPath: task.repoPath,
+        planPath: task.planPath || "",
+        codingPersona: {
+          id: persona.id,
+          name: persona.name,
+          model: persona.model,
+          systemPrompt: persona.systemPrompt,
+          allowedTools: persona.allowedTools,
+          provider: persona.provider,
+        },
+      },
+      async (type, payload) => {
+        await eventService.appendEvent(task.id, type as EventType, payload as any)
+      }
     )
 
     if (result.success) {

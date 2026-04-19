@@ -3,18 +3,40 @@ import { z } from "zod"
 import { spawn } from "child_process"
 import { join } from "path"
 import { homedir } from "os"
-import { checkProviderAuth } from "../opencode/authCheck"
+import { checkProviderAuth, getModelRegistry } from "../agent/piSession"
 
 export const authRouter = new Hono()
 
 /**
- * GET /api/auth/status?provider=anthropic
+ * GET /api/auth/status
  *
- * Checks whether the given provider has valid credentials in
- * ~/.local/share/opencode/auth.json (or env vars).
- * Safe to call frequently — no side effects, just reads the file.
+ * Returns overall auth configuration status — all providers, model counts.
+ * This is what the frontend auth banner should call.
+ * No query params needed.
  */
 authRouter.get("/status", async (c) => {
+  const registry = getModelRegistry()
+  const available = registry.getAvailable()
+  const allModels = registry.getAll()
+
+  const availableProviders = [...new Set(available.map(m => m.provider))]
+  const allProviders = [...new Set(allModels.map(m => m.provider))]
+
+  return c.json({
+    configured: available.length > 0,
+    availableProviders,
+    allProviders,
+    modelCount: available.length,
+    totalModelCount: allModels.length,
+  })
+})
+
+/**
+ * GET /api/auth/provider?provider=anthropic
+ *
+ * Checks whether a specific provider has valid credentials.
+ */
+authRouter.get("/provider", async (c) => {
   const provider = c.req.query("provider")
   if (!provider) {
     return c.json({ error: "provider query param is required" }, 400)
@@ -32,11 +54,9 @@ authRouter.get("/status", async (c) => {
  * POST /api/auth/refresh
  * Body: { provider: string }
  *
- * Spawns `opencode auth login` for the given provider, which triggers the
- * OAuth flow in the user's browser. For API-key providers this is a no-op
- * (returns a message directing the user to set an env var instead).
- *
- * The OAuth browser step cannot be automated — this just initiates the flow.
+ * Spawns `pi` for the given provider to trigger the login flow.
+ * For API-key providers this is a no-op (returns a message directing
+ * the user to set an env var instead).
  */
 authRouter.post("/refresh", async (c) => {
   const body = await c.req.json().catch(() => ({}))
@@ -47,7 +67,7 @@ authRouter.post("/refresh", async (c) => {
 
   const { provider } = parsed.data
 
-  // API-key providers can't be refreshed via CLI — guide the user instead
+  // API-key providers can't be refreshed via login flow — guide the user instead
   const apiKeyProviders = ["deepseek", "openai", "mistral", "groq", "evroc"]
   if (apiKeyProviders.includes(provider.toLowerCase())) {
     const envVar = `${provider.toUpperCase()}_API_KEY`
@@ -58,12 +78,12 @@ authRouter.post("/refresh", async (c) => {
     })
   }
 
-  // OAuth providers — spawn opencode auth login
-  const opencodeBin = join(homedir(), ".opencode", "bin", "opencode")
+  // OAuth providers — spawn pi login
+  const piBin = join(homedir(), ".pi", "bin", "pi")
 
   try {
     // Spawn detached so the process outlives the HTTP request
-    const proc = spawn(opencodeBin, ["auth", "login"], {
+    const proc = spawn(piBin, ["login"], {
       detached: true,
       stdio: "ignore",
       env: { ...process.env },

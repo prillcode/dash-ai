@@ -60,6 +60,7 @@ export type EventType =
   | "AGENT_OUTPUT"
   | "ERROR"
   | "REVIEW_ACTION"
+  | "REVIEW_GENERATED"
   | "PLANNING_EVENT"
   | "CODING_EVENT"
   | "PLAN_FEEDBACK"
