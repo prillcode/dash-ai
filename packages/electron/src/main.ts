@@ -41,12 +41,29 @@ function startStaticServer(apiPort: number, apiToken: string): Promise<number> {
       
       // Proxy API requests to the API server
       if (url.startsWith("/api/") || url.startsWith("/ws/")) {
-        const headers = { ...req.headers }
+        // Node lowercases headers, but check both cases
+        const authHeader = req.headers.authorization || req.headers.Authorization
         
-        // Add Authorization header if not present
-        if (!headers.authorization && apiToken) {
-          headers.authorization = `Bearer ${apiToken}`
+        // Create clean headers object
+        const headers: Record<string, string> = {}
+        
+        // Copy important headers
+        if (req.headers['content-type']) {
+          headers['Content-Type'] = req.headers['content-type'] as string
         }
+        if (req.headers['content-length']) {
+          headers['Content-Length'] = req.headers['content-length'] as string
+        }
+        if (req.headers['accept']) {
+          headers['Accept'] = req.headers['accept'] as string
+        }
+        
+        // Always use our token - ignore browser's auth header
+        if (apiToken) {
+          headers['Authorization'] = `Bearer ${apiToken}`
+        }
+        
+        console.log(`[proxy] ${req.method} ${url} -> ${apiPort}`)
         
         const options = {
           hostname: "127.0.0.1",
@@ -57,6 +74,7 @@ function startStaticServer(apiPort: number, apiToken: string): Promise<number> {
         }
         
         const proxyReq = require("http").request(options, (proxyRes: any) => {
+          console.log(`[proxy] Response: ${proxyRes.statusCode} for ${url}`)
           res.writeHead(proxyRes.statusCode, proxyRes.headers)
           proxyRes.pipe(res)
         })
