@@ -6,10 +6,12 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
     build: {
       outDir: "dist",
-      lib: {
-        entry: resolve(__dirname, "src/main.ts"),
-        formats: ["cjs"],
-        fileName: () => "main.js",
+      rollupOptions: {
+        input: resolve(__dirname, "src/main.ts"),
+        output: {
+          format: "cjs",
+          entryFileNames: "main.js",
+        },
       },
     },
   },
@@ -17,10 +19,21 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
     build: {
       outDir: "dist",
-      lib: {
-        entry: resolve(__dirname, "src/preload.ts"),
-        formats: ["cjs"],
-        fileName: () => "preload.js",
+      rollupOptions: {
+        input: resolve(__dirname, "src/preload.ts"),
+        output: {
+          format: "cjs",
+          entryFileNames: "preload.js",
+        },
+      },
+    },
+  },
+  renderer: {
+    root: resolve(__dirname, "../client"),
+    build: {
+      outDir: resolve(__dirname, "../client/dist"),
+      rollupOptions: {
+        input: resolve(__dirname, "../client/index.html"),
       },
     },
   },

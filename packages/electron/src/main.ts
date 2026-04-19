@@ -5,6 +5,11 @@ import { homedir } from "os"
 import { readFile } from "fs/promises"
 import { fileURLToPath } from "url"
 
+// Disable GPU for headless/CI environments
+app.commandLine.appendSwitch("disable-gpu")
+app.commandLine.appendSwitch("disable-software-rasterizer")
+app.commandLine.appendSwitch("no-sandbox")
+
 // Keep a global reference of the window object
 let mainWindow: BrowserWindow | null = null
 let serverProcess: ReturnType<typeof spawn> | null = null

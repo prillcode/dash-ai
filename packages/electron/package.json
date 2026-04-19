@@ -4,8 +4,11 @@
   "private": true,
   "main": "dist/main.js",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "dev": "npm run build:main && npm run build:preload && electron . -- --no-sandbox --disable-gpu --disable-software-rasterizer",
+    "build": "npm run build:main && npm run build:preload && npm run build:renderer",
+    "build:main": "vite build --config vite.main.config.ts",
+    "build:preload": "vite build --config vite.preload.config.ts",
+    "build:renderer": "pnpm --filter client build",
     "preview": "electron-vite preview",
     "dist": "electron-builder",
     "dist:linux": "electron-builder --linux",

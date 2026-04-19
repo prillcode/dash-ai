@@ -10,6 +10,9 @@ const port = parseInt(process.env.PORT || "3000", 10)
 const server = serve({
   fetch: app.fetch,
   port,
+}, (info) => {
+  const actualPort = info.port
+  console.log(`Dash AI server running on http://localhost:${actualPort}`)
 })
 
 const wss = new WebSocketServer({ noServer: true })
@@ -26,8 +29,6 @@ server.on("upgrade", (request, socket, head) => {
     })
   }
 })
-
-console.log(`Dash AI server running on http://localhost:${port}`)
 
 runStartupChecks()
 
