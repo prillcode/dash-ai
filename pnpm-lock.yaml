@@ -112,6 +112,9 @@ importers:
       '@dash-ai/server':
         specifier: workspace:*
         version: link:../server
+      dotenv:
+        specifier: ^17.3.1
+        version: 17.3.1
       mime-types:
         specifier: ^3.0.2
         version: 3.0.2

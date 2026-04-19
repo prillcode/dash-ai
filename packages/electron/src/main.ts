@@ -5,6 +5,10 @@ import { homedir } from "os"
 import { createServer } from "http"
 import { readFile } from "fs"
 import { lookup } from "mime-types"
+import { config } from "dotenv"
+
+// Load .env file for API keys
+config({ path: join(homedir(), ".dash-ai", ".env") })
 
 // Disable GPU for headless/CI environments
 app.commandLine.appendSwitch("disable-gpu")
