@@ -4,6 +4,7 @@ const navItems = [
   { path: "/tasks", label: "Task Queue", icon: "📋" },
   { path: "/personas", label: "Personas", icon: "👤" },
   { path: "/projects", label: "Projects", icon: "📁" },
+  { path: "/settings", label: "Settings", icon: "⚙️" },
 ]
 
 export function Sidebar() {

@@ -6,6 +6,7 @@ import { Button, FormField } from "../ui"
 import type { Persona, PersonaInput } from "../../types/persona"
 import { PersonaType, PERSONA_PRESETS } from "../../types/persona"
 import { useModels } from "../../api/personas"
+import { useSettings } from "../../api/settings"
 import { marked } from "marked"
 
 interface MarkdownPreviewProps {
@@ -61,6 +62,7 @@ interface PersonaFormProps {
 
 export function PersonaForm({ initialData, onSubmit, isLoading }: PersonaFormProps) {
   const { data: modelsData } = useModels()
+  const { data: settings } = useSettings()
 
   const [descriptionPreview, setDescriptionPreview] = useState(false)
   const [systemPromptPreview, setSystemPromptPreview] = useState(false)
@@ -88,8 +90,8 @@ export function PersonaForm({ initialData, onSubmit, isLoading }: PersonaFormPro
         }
       : {
           personaType: "custom",
-          model: "claude-sonnet-4-5",
-          provider: "anthropic",
+          model: settings?.defaultModel || "claude-sonnet-4-5",
+          provider: settings?.defaultProvider || "anthropic",
           allowedTools: [],
         },
   })
