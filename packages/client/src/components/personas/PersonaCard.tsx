@@ -23,6 +23,7 @@ export function PersonaCard({ persona, onToggle, onDelete }: PersonaCardProps) {
           </div>
           <p className="text-sm text-muted mt-1 line-clamp-2">{persona.description}</p>
           <div className="flex items-center gap-2 mt-2">
+            <Badge color="orange">{persona.provider}</Badge>
             <Badge color="blue">{persona.model}</Badge>
             {persona.tags.slice(0, 3).map((tag) => (
               <Badge key={tag} color="purple">{tag}</Badge>
