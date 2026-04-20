@@ -35,12 +35,14 @@ pi config set-api-key       # For API key providers
 
 ### Option 2: Environment Variables
 ```bash
-# Add to ~/.dash-ai/.env or your shell profile
+# Web/server development: add to repo-root .env or your shell profile
 export OPENAI_API_KEY=sk-...
 export ANTHROPIC_API_KEY=sk-ant-...
 export DEEPSEEK_API_KEY=...
 # etc.
 ```
+
+For the Electron app, environment variables can also be loaded from `~/.dash-ai/.env`.
 
 **Only providers with configured API keys appear in the Persona dropdown.** The provider list is filtered to show only authenticated providers from Pi SDK's `AuthStorage`.
 
@@ -57,35 +59,43 @@ pnpm install
 ### 2. Configure environment
 
 ```bash
-cp packages/server/.env.example packages/server/.env
+cp .env.example .env
 ```
 
-Edit `packages/server/.env`:
+Edit the repo-root `.env`:
 
 ```bash
 # Required: secret token for API auth
 # Generate with: openssl rand -hex 32
 API_TOKEN=your-secret-token-here
 
+# Required for the Vite client; must match API_TOKEN
+VITE_API_TOKEN=your-secret-token-here
+
 # Optional
 PORT=3000
 MAX_CONCURRENT_SESSIONS=3
 ```
 
+Notes:
+- The standalone server loads environment variables from the repo-root `.env`.
+- `packages/server/.env` is not used by the normal web development flow.
+- Electron loads its own environment from `~/.dash-ai/.env`.
+
 ### 3. Configure your AI provider(s)
 
 **Via Pi CLI:**
 ```bash
-# Set up Anthropic (Claude)
-export ANTHROPIC_API_KEY=sk-ant-...
-pi login anthropic
+# OAuth-capable providers
+pi login
 
-# Or set up OpenAI
-export OPENAI_API_KEY=sk-...
-pi login openai
+# API-key providers
+pi config set-api-key
 ```
 
-Keys are stored in `~/.pi/agent/auth.json` and automatically detected by Dash AI.
+**Or via environment variables:** add provider keys to the repo-root `.env` (web/server) or `~/.dash-ai/.env` (Electron).
+
+Keys stored in `~/.pi/agent/auth.json` are also automatically detected by Dash AI.
 
 ### 4. Apply migrations
 
@@ -99,7 +109,17 @@ Database is created at `~/.dash-ai/dashboard.db` (SQLite, local file).
 
 ### 5. Start development
 
-**Option A: Web + Server (development)**
+**Option A: Web app (recommended for normal development)**
+```bash
+pnpm dev
+```
+
+This runs the standalone API server and the Vite React client in parallel from one terminal.
+
+- Client: http://localhost:5173
+- Server: http://localhost:3000
+
+Equivalent manual commands if needed:
 ```bash
 # Terminal 1: API Server
 pnpm --filter server dev
@@ -107,20 +127,27 @@ pnpm --filter server dev
 # Terminal 2: React Client
 pnpm --filter client dev
 ```
-- Client: http://localhost:5173
-- Server: http://localhost:3000
 
-**Option B: Electron Desktop App**
+**Option B: Electron desktop app**
 ```bash
-cd packages/electron
-pnpm run dev
+pnpm dev:electron
 ```
+
+Electron uses the same React UI from `packages/client`, but runs it inside a desktop shell and starts an embedded API server automatically. It loads provider/API-key environment variables from `~/.dash-ai/.env`.
 
 **Option C: CLI**
 ```bash
 cd packages/cli
 node dist/index.js --help
 ```
+
+## Package roles
+
+- `packages/client` — shared React frontend UI
+- `packages/server` — standalone Hono API server, database access, queue worker, and Pi SDK integration
+- `packages/electron` — desktop wrapper that launches an embedded server and serves the built client UI locally
+
+In other words, `packages/client` is not a separate product from Electron — Electron reuses that same frontend inside a desktop app.
 
 ## Personas
 
