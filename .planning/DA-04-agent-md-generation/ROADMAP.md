@@ -7,10 +7,24 @@
 **Outputs:**
 - [ ] `packages/server/src/services/agentMdService.ts` — analysis + generation logic
 - [ ] Project structure analysis (read package.json, tsconfig.json, README, list directories)
-- [ ] LLM prompt construction (ask for concise tech stack, conventions, architecture)
+- [ ] LLM prompt construction using `agentMdPrompt` from Settings
+- [ ] Combine user prompt with project analysis context
 - [ ] Use default provider/model from Settings (depends on DA-03)
 - [ ] Save generated content to `{project_path}/Agent.md`
 - [ ] Error handling for file system issues
+
+**Prompt Strategy:**
+```
+[User's agentMdPrompt from Settings]
+
+---
+
+Project Analysis Context:
+- Files analyzed: package.json, tsconfig.json, README.md, etc.
+- Directory structure: src/, tests/, docs/, etc.
+- Key dependencies: (extracted from package.json)
+- Scripts available: (from package.json)
+```
 
 ## Phase 02 — API Endpoint
 
@@ -59,12 +73,13 @@
 
 ## Dependencies
 
-- **DA-03 (App Settings)** — Uses default provider/model
+- **DA-03 (App Settings)** — Uses default provider/model and `agentMdPrompt`
 - **Pi SDK** — For LLM generation
 
 ## Notes
 
-- Agent.md should be concise (prompt should emphasize this)
+- Agent.md should be concise (default prompt emphasizes 150 line max)
+- User can customize generation via `agentMdPrompt` in Settings
 - Analysis should be fast (don't read all files, just key ones)
 - Consider caching analysis results if re-generating quickly
 - Viewer should handle code blocks nicely (syntax highlighting if possible)

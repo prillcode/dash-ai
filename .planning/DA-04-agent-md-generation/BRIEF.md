@@ -41,7 +41,8 @@ Example Agent.md contents:
 3. **View-only in UI** — Read-only markdown viewer, no editing
 4. **Overwrite warning** — Re-generate warns user: "Existing Agent.md will be overwritten"
 5. **Uses Settings defaults** — LLM provider/model from App Settings (DA-03)
-6. **Concise output** — Prompt asks LLM to keep it brief and focused
+6. **Customizable prompt** — Uses `agentMdPrompt` from Settings to guide generation
+7. **Concise output** — Default prompt asks LLM to keep it brief and focused (150 line guideline)
 
 ## Relevant Files
 
@@ -59,9 +60,10 @@ Example Agent.md contents:
 - [ ] "No Agent.md found" shown when file doesn't exist
 - [ ] Re-generate button warns about overwrite
 - [ ] Uses default provider/model from Settings
+- [ ] Uses `agentMdPrompt` from Settings to guide LLM generation
 - [ ] Works in Web, CLI (command), and Electron
 
 ## Dependencies
 
-- **DA-03 (App Settings)** — Uses default provider/model from settings
+- **DA-03 (App Settings)** — Uses default provider/model and `agentMdPrompt` from settings
 - Pi SDK skills available for LLM calls
