@@ -1,10 +1,10 @@
 {
   "name": "dash-ai",
-  "version": "0.6.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "pnpm --parallel --stream --filter @dash-ai/server --filter @dash-ai/client dev",
-    "dev:electron": "pnpm --filter @dash-ai/electron dev",
+    "dev:electron": "pnpm --filter dash-ai-electron dev",
     "build": "pnpm -r build",
     "db:generate": "pnpm --filter server db:generate",
     "db:migrate": "pnpm --filter server db:migrate"

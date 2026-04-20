@@ -1,11 +1,42 @@
 import { app, BrowserWindow, ipcMain, Menu } from "electron"
 import { spawn } from "child_process"
-import { join } from "path"
+import { delimiter, join } from "path"
 import { homedir } from "os"
 import { createServer } from "http"
 import { readFile } from "fs"
 import { lookup } from "mime-types"
 import { config } from "dotenv"
+
+function getClientDistPath(): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, "client", "dist")
+    : join(__dirname, "../../client/dist")
+}
+
+function getServerEntryPath(): { command: string; args: string[]; env: NodeJS.ProcessEnv } {
+  if (app.isPackaged) {
+    return {
+      command: process.execPath,
+      args: [join(process.resourcesPath, "server", "dist", "index.js")],
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: "1",
+        NODE_PATH: [
+          join(process.resourcesPath, "app.asar", "node_modules"),
+          process.env.NODE_PATH,
+        ]
+          .filter(Boolean)
+          .join(delimiter),
+      },
+    }
+  }
+
+  return {
+    command: join(__dirname, "../../cli/node_modules/.bin/tsx"),
+    args: [join(__dirname, "../../server/src/index.ts")],
+    env: { ...process.env },
+  }
+}
 
 // Load .env file for API keys
 config({ path: join(homedir(), ".dash-ai", ".env") })
@@ -38,7 +69,7 @@ function generateToken(): string {
 // Start a simple HTTP server to serve the React client static files
 function startStaticServer(apiPort: number, apiToken: string): Promise<number> {
   return new Promise((resolve, reject) => {
-    const clientDist = join(__dirname, "../../client/dist")
+    const clientDist = getClientDistPath()
     
     staticServer = createServer((req, res) => {
       const url = req.url || "/"
@@ -135,12 +166,10 @@ async function startEmbeddedServer(): Promise<{ url: string; token: string }> {
   const token = generateToken()
   serverToken = token
 
-  // Use tsx to run the server source directly
-  const serverSrc = join(__dirname, "../../server/src/index.ts")
-  const tsxBin = join(__dirname, "../../cli/node_modules/.bin/tsx")
+  const serverRuntime = getServerEntryPath()
 
   const env = {
-    ...process.env,
+    ...serverRuntime.env,
     PORT: "0", // Random port
     API_TOKEN: token,
     SQLITE_DB_PATH: join(homedir(), ".dash-ai", "dashboard.db"),
@@ -151,8 +180,8 @@ async function startEmbeddedServer(): Promise<{ url: string; token: string }> {
   console.log("[electron] Using token:", token.slice(0, 8) + "...")
   
   serverProcess = spawn(
-    tsxBin,
-    [serverSrc],
+    serverRuntime.command,
+    serverRuntime.args,
     {
       env,
       stdio: ["ignore", "pipe", "pipe"],

@@ -1,19 +1,26 @@
 {
-  "name": "@dash-ai/electron",
-  "version": "0.1.0",
+  "name": "dash-ai-electron",
+  "version": "1.0.0",
   "private": true,
+  "description": "Dash AI desktop app with embedded local server",
+  "homepage": "https://github.com/prillcode/dash-ai",
+  "author": {
+    "name": "Aaron Prill",
+    "email": "prillcode@gmail.com"
+  },
   "main": "dist/main.js",
   "scripts": {
     "dev": "pnpm run build:main && pnpm run build:preload && electron . --enable-logging --no-sandbox",
-    "build": "pnpm run build:main && pnpm run build:preload && pnpm run build:renderer",
+    "build": "pnpm run build:server && pnpm run build:main && pnpm run build:preload && pnpm run build:renderer",
+    "build:server": "pnpm --filter @dash-ai/server build",
     "build:main": "vite build --config vite.main.config.ts",
     "build:preload": "vite build --config vite.preload.config.ts",
-    "build:renderer": "pnpm --filter client build",
+    "build:renderer": "pnpm --filter @dash-ai/client build",
     "preview": "electron-vite preview",
-    "dist": "electron-builder",
-    "dist:linux": "electron-builder --linux",
-    "dist:mac": "electron-builder --mac",
-    "dist:win": "electron-builder --win"
+    "dist": "pnpm run build && electron-builder",
+    "dist:linux": "pnpm run build && electron-builder --linux",
+    "dist:mac": "pnpm run build && electron-builder --mac",
+    "dist:win": "pnpm run build && electron-builder --win"
   },
   "dependencies": {
     "@dash-ai/server": "workspace:*",
@@ -32,8 +39,11 @@
     "appId": "com.dashai.app",
     "productName": "Dash AI",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
+    "npmRebuild": false,
+    "icon": "build/icons/icon.png",
     "files": [
       "dist/**/*",
       "node_modules/**/*"
@@ -42,21 +52,31 @@
       {
         "from": "../server/dist",
         "to": "server/dist"
+      },
+      {
+        "from": "../client/dist",
+        "to": "client/dist"
       }
     ],
     "mac": {
+      "icon": "build/icons/icon.icns",
       "target": [
         "dmg",
         "zip"
       ]
     },
     "linux": {
+      "category": "Development",
+      "icon": "build/icons",
+      "executableName": "dash-ai",
+      "maintainer": "Aaron Prill <prillcode@gmail.com>",
       "target": [
         "AppImage",
         "deb"
       ]
     },
     "win": {
+      "icon": "build/icons/icon.ico",
       "target": [
         "nsis",
         "portable"

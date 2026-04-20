@@ -5,6 +5,9 @@ node_modules/
 # Build outputs
 dist/
 build/
+!packages/electron/build/
+!packages/electron/build/icons/
+!packages/electron/build/icons/**
 *.tsbuildinfo
 
 # Environment
@@ -33,6 +36,7 @@ Thumbs.db
 # Dash AI specific
 # NOTE: Do NOT ignore migrations/ - schema changes must be version controlled
 packages/client/dist/
+packages/electron/release/
 .turbo/
 
 # Temporary
