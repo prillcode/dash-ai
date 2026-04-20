@@ -6,13 +6,19 @@ services:
         VITE_API_TOKEN: ${VITE_API_TOKEN}
     image: dash-ai:latest
     ports:
+      # Host:Container mapping. If PORT is set in the repo-root .env (for example PORT=3210),
+      # Docker publishes host port 3210 to container port 3000. If PORT is not set, it defaults to 3000.
       - "${PORT:-3000}:3000"
     env_file:
       - .env
     environment:
-      SQLITE_DB_PATH: /data/dashboard.db
+      # The app listens on port 3000 inside the container; only the host-side published port is variable.
       PORT: 3000
+      # SQLite database path inside the container. This lives on the /data volume mounted below.
+      SQLITE_DB_PATH: /data/dashboard.db
     volumes:
+      # Named Docker volume for persistent app data. The SQLite DB is stored at /data/dashboard.db in the
+      # container and survives container recreation because /data is backed by the dash-ai-data volume.
       - dash-ai-data:/data
       # Optional: mount Pi auth + skills for full planning/coding support inside the container
       - ${HOME}/.pi:/root/.pi:ro
@@ -23,3 +29,4 @@ services:
 
 volumes:
   dash-ai-data:
+    # Docker-managed named volume used to persist the SQLite DB and other /data contents.
