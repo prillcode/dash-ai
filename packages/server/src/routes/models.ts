@@ -14,7 +14,7 @@ const PROVIDER_META: Record<string, { name: string; note?: string }> = {
   mistral: { name: "Mistral" },
   groq: { name: "Groq" },
   openrouter: { name: "OpenRouter" },
-  zai: { name: "Z.AI" },
+  zai: { name: "zai" },
   ollama: { name: "Ollama (local)" },
   cerebras: { name: "Cerebras" },
   xai: { name: "xAI" },
@@ -43,49 +43,15 @@ modelsRouter.get("/", async (c) => {
     const auth = getAuth()
 
     const allModels = registry.getAll()
-    const available = registry.getAvailable()
-    const availableKeys = new Set(available.map(m => `${m.provider}/${m.id}`))
-
-    // Group all models by provider
-    const byProvider = new Map<string, Model<Api>[]>()
-    for (const model of allModels) {
-      const existing = byProvider.get(model.provider) ?? []
-      existing.push(model)
-      byProvider.set(model.provider, existing)
-    }
-
-    const providers: ProviderResponse[] = []
-    for (const [provider, models] of byProvider) {
-      const meta = PROVIDER_META[provider] ?? { name: provider }
-      const modelResponses: ModelResponse[] = models.map(m => ({
-        id: m.id,
-        name: m.name,
-        reasoning: m.reasoning ?? false,
-        contextWindow: m.contextWindow,
-        maxTokens: m.maxTokens,
-        input: m.input,
-        available: availableKeys.has(`${m.provider}/${m.id}`),
-        cost: m.cost,
-      }))
-      providers.push({ id: provider, name: meta.name, models: modelResponses })
-    }
-
-    // Sort providers: known ones first, then alphabetical
-    const knownOrder = Object.keys(PROVIDER_META)
-    providers.sort((a, b) => {
-      const aIdx = knownOrder.indexOf(a.id)
-      const bIdx = knownOrder.indexOf(b.id)
-      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx
-      if (aIdx !== -1) return -1
-      if (bIdx !== -1) return 1
-      return a.name.localeCompare(b.name)
-    })
-
-    // Auth methods per provider
-    const authMethods: Record<string, { type: string; configured: boolean }> = {}
+    
+    // Build auth status map first
     const allProviders = [...new Set(allModels.map(m => m.provider))]
+    const authMethods: Record<string, { type: string; configured: boolean }> = {}
+    const providerHasAuth = new Map<string, boolean>()
+    
     for (const p of allProviders) {
       const hasAuth = auth.hasAuth(p)
+      providerHasAuth.set(p, hasAuth)
       // Determine auth type heuristically
       const envVarMap: Record<string, string> = {
         anthropic: "ANTHROPIC_API_KEY",
@@ -101,6 +67,43 @@ modelsRouter.get("/", async (c) => {
       const envVar = envVarMap[p] ?? `${p.toUpperCase()}_API_KEY`
       authMethods[p] = { type: hasAuth ? "configured" : "env_var", configured: hasAuth }
     }
+
+    // Group all models by provider
+    const byProvider = new Map<string, Model<Api>[]>()
+    for (const model of allModels) {
+      const existing = byProvider.get(model.provider) ?? []
+      existing.push(model)
+      byProvider.set(model.provider, existing)
+    }
+
+    const providers: ProviderResponse[] = []
+    for (const [provider, models] of byProvider) {
+      const meta = PROVIDER_META[provider] ?? { name: provider }
+      const hasAuth = providerHasAuth.get(provider) ?? false
+      const modelResponses: ModelResponse[] = models.map(m => ({
+        id: m.id,
+        name: m.name,
+        reasoning: m.reasoning ?? false,
+        contextWindow: m.contextWindow,
+        maxTokens: m.maxTokens,
+        input: m.input,
+        // Model is available if provider has auth configured
+        available: hasAuth,
+        cost: m.cost,
+      }))
+      providers.push({ id: provider, name: meta.name, models: modelResponses })
+    }
+
+    // Sort providers: known ones first, then alphabetical
+    const knownOrder = Object.keys(PROVIDER_META)
+    providers.sort((a, b) => {
+      const aIdx = knownOrder.indexOf(a.id)
+      const bIdx = knownOrder.indexOf(b.id)
+      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx
+      if (aIdx !== -1) return -1
+      if (bIdx !== -1) return 1
+      return a.name.localeCompare(b.name)
+    })
 
     return c.json({ providers, authMethods })
   } catch (err: any) {
