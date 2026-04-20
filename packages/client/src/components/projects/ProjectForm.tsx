@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Button, FormField } from "../ui"
 import { useValidatePath } from "../../api/projects"
+import { useSettings } from "../../api/settings"
 import type { Project, ProjectInput } from "../../types/project"
 
 const projectSchema = z.object({
@@ -18,18 +19,19 @@ interface ProjectFormProps {
   isLoading?: boolean
 }
 
-function suggestContainerProjectPath(input?: string): string | null {
+function suggestContainerProjectPath(input: string | undefined, projectsRoot: string): string | null {
   if (!input) return null
 
   const trimmed = input.trim()
   if (!trimmed) return null
-  if (trimmed.startsWith("/projects/")) return null
+  if (trimmed.startsWith(`${projectsRoot}/`)) return null
 
+  const normalizedRoot = projectsRoot.replace(/\/$/, "")
   const homeDevMatch = trimmed.match(/^~\/dev\/(.+)$/)
-  if (homeDevMatch) return `/projects/${homeDevMatch[1]}`
+  if (homeDevMatch) return `${normalizedRoot}/${homeDevMatch[1]}`
 
   const absoluteDevMatch = trimmed.match(/^\/home\/[^/]+\/dev\/(.+)$/)
-  if (absoluteDevMatch) return `/projects/${absoluteDevMatch[1]}`
+  if (absoluteDevMatch) return `${normalizedRoot}/${absoluteDevMatch[1]}`
 
   return null
 }
@@ -54,8 +56,13 @@ export function ProjectForm({ initialData, onSubmit, isLoading }: ProjectFormPro
         },
   })
 
+  const { data: settings } = useSettings()
+  const deploymentMode = settings?.deploymentMode
+  const projectsRoot = settings?.projectsRoot || "/projects"
+  const isDockerDeployment = deploymentMode === "docker"
+
   const watchedPath = watch("path")
-  const suggestedContainerPath = suggestContainerProjectPath(watchedPath)
+  const suggestedContainerPath = suggestContainerProjectPath(watchedPath, projectsRoot)
   const {
     data: validation,
     isLoading: validating,
@@ -104,13 +111,27 @@ export function ProjectForm({ initialData, onSubmit, isLoading }: ProjectFormPro
         <label className="block text-sm font-medium text-muted">Path</label>
         <input
           {...register("path")}
-          placeholder="Native: ~/dev/my-repo  •  Docker: /projects/my-repo"
+          placeholder={isDockerDeployment
+            ? `Docker: ${projectsRoot}/my-repo`
+            : `Native: ~/dev/my-repo${settings?.projectsRoot ? `  •  Docker: ${projectsRoot}/my-repo` : ""}`}
           className="form-input w-full px-3 py-2"
         />
         <div className="text-xs text-muted mt-1 space-y-1">
           <p>Use a filesystem path the Dash-AI server can access.</p>
-          <p>Native/web mode: <span className="code-inline">~/dev/my-repo</span></p>
-          <p>Docker mode: <span className="code-inline">/projects/my-repo</span> (maps to host <span className="code-inline">~/dev/my-repo</span>)</p>
+          {isDockerDeployment ? (
+            <>
+              <p>Deployment mode: <span className="code-inline">docker</span></p>
+              <p>Projects root: <span className="code-inline">{projectsRoot}</span></p>
+              <p>Enter container paths like <span className="code-inline">{projectsRoot}/my-repo</span>.</p>
+            </>
+          ) : (
+            <>
+              <p>Native/web mode: <span className="code-inline">~/dev/my-repo</span></p>
+              {settings?.projectsRoot && (
+                <p>Docker mode: <span className="code-inline">{projectsRoot}/my-repo</span> (maps to host <span className="code-inline">~/dev/my-repo</span>)</p>
+              )}
+            </>
+          )}
           {suggestedContainerPath && (
             <p>
               Docker suggestion: <span className="code-inline">{suggestedContainerPath}</span>{" "}

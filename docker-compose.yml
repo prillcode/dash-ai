@@ -14,6 +14,8 @@ services:
     environment:
       # The app listens on port 3000 inside the container; only the host-side published port is variable.
       PORT: 3000
+      DEPLOYMENT_MODE: docker
+      PROJECTS_ROOT: /projects
       # SQLite database path inside the container. This lives on the /data volume mounted below.
       SQLITE_DB_PATH: /data/dashboard.db
     volumes:
@@ -23,8 +25,9 @@ services:
       # Optional: mount Pi auth + skills for full planning/coding support inside the container
       - ${HOME}/.pi:/root/.pi:ro
       - ${HOME}/.agents:/root/.agents:ro
-      # Optional: mount local repos/workspaces and register projects using container paths
-      # - ./workspaces:/workspaces
+      # Mount host development repos so Dash-AI in Docker can read/write project files.
+      # Register projects using container paths like /projects/my-repo.
+      - ${HOME}/dev:/projects
     restart: unless-stopped
 
 volumes:

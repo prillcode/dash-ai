@@ -1,6 +1,6 @@
 {
   "name": "dash-ai-electron",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Dash AI desktop app with embedded local server",
   "homepage": "https://github.com/prillcode/dash-ai",

@@ -312,6 +312,7 @@ docker run -d \
 Notes:
 - `VITE_API_TOKEN` must match `API_TOKEN` when building/running the web app.
 - The Docker setup persists SQLite data in `/data/dashboard.db`.
+- Docker sets `DEPLOYMENT_MODE=docker` and `PROJECTS_ROOT=/projects` so the UI can guide users toward container-visible repo paths.
 - For full planning/coding support in Docker, mount Pi auth/skills and any local repos the agent needs to access.
 
 ### Electron Packaging

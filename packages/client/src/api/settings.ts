@@ -11,6 +11,8 @@ export interface Settings {
   uiTheme?: "dark" | "light" | "system"
   confirmDestructiveActions?: boolean
   agentMdPrompt?: string
+  deploymentMode?: string
+  projectsRoot?: string
 }
 
 export function useSettings() {

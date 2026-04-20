@@ -59,6 +59,10 @@ export interface DefaultSettings {
 
   // Agent.md generation
   agentMdPrompt?: string
+
+  // Deployment hints (env-backed, read-only via API)
+  deploymentMode?: string
+  projectsRoot?: string
 }
 
 /**
@@ -125,6 +129,8 @@ export async function getDefaultSettings(): Promise<DefaultSettings> {
     confirmDestructiveActions:
       allSettings.confirmDestructiveActions === "true",
     agentMdPrompt: allSettings.agentMdPrompt || DEFAULT_AGENT_MD_PROMPT,
+    deploymentMode: process.env.DEPLOYMENT_MODE,
+    projectsRoot: process.env.PROJECTS_ROOT,
   }
 }
 
