@@ -18,6 +18,22 @@ interface ProjectFormProps {
   isLoading?: boolean
 }
 
+function suggestContainerProjectPath(input?: string): string | null {
+  if (!input) return null
+
+  const trimmed = input.trim()
+  if (!trimmed) return null
+  if (trimmed.startsWith("/projects/")) return null
+
+  const homeDevMatch = trimmed.match(/^~\/dev\/(.+)$/)
+  if (homeDevMatch) return `/projects/${homeDevMatch[1]}`
+
+  const absoluteDevMatch = trimmed.match(/^\/home\/[^/]+\/dev\/(.+)$/)
+  if (absoluteDevMatch) return `/projects/${absoluteDevMatch[1]}`
+
+  return null
+}
+
 export function ProjectForm({ initialData, onSubmit, isLoading }: ProjectFormProps) {
   const {
     register,
@@ -39,6 +55,7 @@ export function ProjectForm({ initialData, onSubmit, isLoading }: ProjectFormPro
   })
 
   const watchedPath = watch("path")
+  const suggestedContainerPath = suggestContainerProjectPath(watchedPath)
   const {
     data: validation,
     isLoading: validating,
@@ -87,9 +104,26 @@ export function ProjectForm({ initialData, onSubmit, isLoading }: ProjectFormPro
         <label className="block text-sm font-medium text-muted">Path</label>
         <input
           {...register("path")}
-          placeholder="~ /home/user/projects/my-app"
+          placeholder="Native: ~/dev/my-repo  •  Docker: /projects/my-repo"
           className="form-input w-full px-3 py-2"
         />
+        <div className="text-xs text-muted mt-1 space-y-1">
+          <p>Use a filesystem path the Dash-AI server can access.</p>
+          <p>Native/web mode: <span className="code-inline">~/dev/my-repo</span></p>
+          <p>Docker mode: <span className="code-inline">/projects/my-repo</span> (maps to host <span className="code-inline">~/dev/my-repo</span>)</p>
+          {suggestedContainerPath && (
+            <p>
+              Docker suggestion: <span className="code-inline">{suggestedContainerPath}</span>{" "}
+              <button
+                type="button"
+                className="text-accent hover:underline"
+                onClick={() => setValue("path", suggestedContainerPath, { shouldDirty: true, shouldValidate: true })}
+              >
+                Use this path
+              </button>
+            </p>
+          )}
+        </div>
         <div className="text-sm mt-1 min-h-[1.5rem]">
           {validationMessage()}
         </div>
