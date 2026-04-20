@@ -37,7 +37,7 @@
   },
   "build": {
     "appId": "com.dashai.app",
-    "productName": "Dash AI",
+    "productName": "Dash-AI",
     "directories": {
       "output": "release",
       "buildResources": "build"
