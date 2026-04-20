@@ -2,24 +2,63 @@ import { eq } from "drizzle-orm"
 import { db } from "../db/client"
 import { settings } from "../db/schema"
 
+export const DEFAULT_AGENT_MD_PROMPT = `Generate a concise Agent.md file (max 150 lines) for this project.
+
+Include these sections:
+
+## Tech Stack
+- Language(s) and version(s)
+- Framework(s) and key dependencies
+- Database/ORM if applicable
+
+## Key Conventions
+- Import patterns (e.g., path aliases)
+- Naming conventions
+- Critical coding rules specific to this project
+
+## Architecture
+- High-level directory structure
+- Key directories and their purposes
+- Where different types of code live
+
+## Development Workflow
+- Build/test commands
+- Pre-commit requirements
+- Any project-specific scripts
+
+## Gotchas & Pitfalls
+- Common mistakes for this codebase
+- Non-obvious requirements
+- Things that break easily
+
+Rules:
+- Use bullet points, not long paragraphs
+- Be specific to THIS project (omit generic advice)
+- Focus on what an AI coding agent needs to know
+- Keep it under 150 lines
+- Structure with clear markdown headings`
+
 export interface DefaultSettings {
   // AI Provider defaults
   defaultProvider?: string
   defaultModel?: string
-  
+
   // Persona defaults
   defaultPlannerPersonaId?: string
   defaultCoderPersonaId?: string
-  
+
   // Project defaults
   defaultProjectId?: string
-  
+
   // Workflow automation
   autoStartPlanning?: boolean
-  
+
   // UI preferences
   uiTheme?: "dark" | "light" | "system"
   confirmDestructiveActions?: boolean
+
+  // Agent.md generation
+  agentMdPrompt?: string
 }
 
 /**
@@ -85,6 +124,7 @@ export async function getDefaultSettings(): Promise<DefaultSettings> {
     uiTheme: (allSettings.uiTheme as "dark" | "light" | "system") ?? "dark",
     confirmDestructiveActions:
       allSettings.confirmDestructiveActions === "true",
+    agentMdPrompt: allSettings.agentMdPrompt || DEFAULT_AGENT_MD_PROMPT,
   }
 }
 

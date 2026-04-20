@@ -23,6 +23,9 @@ const updateSettingsSchema = z.object({
   // UI preferences
   uiTheme: z.enum(["dark", "light", "system"]).optional(),
   confirmDestructiveActions: z.boolean().optional(),
+
+  // Agent.md generation
+  agentMdPrompt: z.string().max(5000).optional(),
 })
 
 /**
@@ -91,6 +94,7 @@ settingsRouter.patch("/", async (c) => {
     ...(parsed.data.autoStartPlanning !== undefined && { autoStartPlanning: parsed.data.autoStartPlanning }),
     ...(parsed.data.uiTheme && { uiTheme: parsed.data.uiTheme }),
     ...(parsed.data.confirmDestructiveActions !== undefined && { confirmDestructiveActions: parsed.data.confirmDestructiveActions }),
+    ...(parsed.data.agentMdPrompt !== undefined && { agentMdPrompt: parsed.data.agentMdPrompt }),
   })
 
   return c.json(updated)

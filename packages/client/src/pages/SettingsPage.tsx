@@ -6,6 +6,42 @@ import { useProjects } from "../api/projects"
 import { useModels } from "../api/personas"
 import { Button, Spinner } from "../components/ui"
 
+const DEFAULT_AGENT_MD_PROMPT = `Generate a concise Agent.md file (max 150 lines) for this project.
+
+Include these sections:
+
+## Tech Stack
+- Language(s) and version(s)
+- Framework(s) and key dependencies
+- Database/ORM if applicable
+
+## Key Conventions
+- Import patterns (e.g., path aliases)
+- Naming conventions
+- Critical coding rules specific to this project
+
+## Architecture
+- High-level directory structure
+- Key directories and their purposes
+- Where different types of code live
+
+## Development Workflow
+- Build/test commands
+- Pre-commit requirements
+- Any project-specific scripts
+
+## Gotchas & Pitfalls
+- Common mistakes for this codebase
+- Non-obvious requirements
+- Things that break easily
+
+Rules:
+- Use bullet points, not long paragraphs
+- Be specific to THIS project (omit generic advice)
+- Focus on what an AI coding agent needs to know
+- Keep it under 150 lines
+- Structure with clear markdown headings`
+
 export function SettingsPage() {
   const navigate = useNavigate()
   const { data: settings, isLoading: isLoadingSettings } = useSettings()
@@ -24,6 +60,7 @@ export function SettingsPage() {
     autoStartPlanning: false,
     uiTheme: "dark" as "dark" | "light" | "system",
     confirmDestructiveActions: true,
+    agentMdPrompt: "",
   })
 
   // Track if form is dirty
@@ -42,6 +79,7 @@ export function SettingsPage() {
         autoStartPlanning: settings.autoStartPlanning || false,
         uiTheme: settings.uiTheme || "dark",
         confirmDestructiveActions: settings.confirmDestructiveActions !== false,
+        agentMdPrompt: settings.agentMdPrompt || "",
       })
       setIsDirty(false)
     }
@@ -91,6 +129,7 @@ export function SettingsPage() {
         autoStartPlanning: formState.autoStartPlanning,
         uiTheme: formState.uiTheme,
         confirmDestructiveActions: formState.confirmDestructiveActions,
+        agentMdPrompt: formState.agentMdPrompt || undefined,
       })
       setSaveStatus("success")
       setIsDirty(false)
@@ -300,6 +339,46 @@ export function SettingsPage() {
           <p className="text-xs text-subtle ml-7">
             Show confirmation dialogs before deleting personas, tasks, or regenerating Agent.md files.
           </p>
+        </section>
+
+        {/* Section 6: Agent.md Generation */}
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-text border-b border-border pb-2">
+            Agent.md Generation
+          </h2>
+          
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-muted">
+                Generation Prompt
+              </label>
+              <span className="text-xs text-subtle">
+                {formState.agentMdPrompt.length}/5000 characters
+              </span>
+            </div>
+            <textarea
+              value={formState.agentMdPrompt}
+              onChange={(e) => handleChange("agentMdPrompt", e.target.value)}
+              rows={12}
+              className="form-input w-full px-3 py-2 text-sm font-mono"
+              placeholder="Instructions for generating Agent.md files..."
+            />
+            <p className="text-xs text-subtle">
+              This prompt guides the AI when generating Agent.md files for your projects. 
+              Keep it focused on what an AI agent needs to know about your codebase.
+            </p>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                // Reset to default - we'll fetch it from the server default
+                setFormState((prev) => ({ ...prev, agentMdPrompt: DEFAULT_AGENT_MD_PROMPT }))
+                setIsDirty(true)
+              }}
+              className="text-sm"
+            >
+              Reset to Default
+            </Button>
+          </div>
         </section>
 
         {/* Actions */}

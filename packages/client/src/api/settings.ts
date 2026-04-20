@@ -10,6 +10,7 @@ export interface Settings {
   autoStartPlanning?: boolean
   uiTheme?: "dark" | "light" | "system"
   confirmDestructiveActions?: boolean
+  agentMdPrompt?: string
 }
 
 export function useSettings() {
