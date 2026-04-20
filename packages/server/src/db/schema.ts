@@ -88,6 +88,15 @@ export const taskEvents = sqliteTable("task_events", {
   taskIdCreatedAtIdx: index("idx_task_events_task_id_created_at").on(table.taskId, table.createdAt),
 }))
 
+export const settings = sqliteTable("settings", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  value: text("value").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (table) => ({
+  keyIdx: index("idx_settings_key").on(table.key),
+}))
+
 export const TaskStatus = {
   DRAFT: "DRAFT",
   IN_PLANNING: "IN_PLANNING",

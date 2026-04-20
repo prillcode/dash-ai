@@ -12,6 +12,7 @@ import { eventsRouter } from "./routes/events"
 import { modelsRouter } from "./routes/models"
 import { projectsRouter } from "./routes/projects"
 import { authRouter } from "./routes/auth"
+import { settingsRouter } from "./routes/settings"
 import { authMiddleware } from "./middleware/auth"
 import { loggerMiddleware } from "./middleware/logger"
 import { getModelRegistry } from "./agent/piSession"
@@ -50,6 +51,7 @@ export function createApp(options: AppOptions = {}): Hono {
   app.route("/api/tasks/:taskId/events", eventsRouter)
   app.route("/api/projects", projectsRouter)
   app.route("/api/auth", authRouter)
+  app.route("/api/settings", settingsRouter)
 
   app.use("/*", serveStatic({ root: distPath }))
 

@@ -21,14 +21,20 @@ Settings will be stored in the SQLite database (key-value table) so they're shar
 - Database migration: `settings` table (key-value store)
 - API endpoints: `GET /api/settings`, `PATCH /api/settings`
 - React component: Settings page at `/settings`
-- Form fields: Default Provider, Default Model (cascading dropdown)
-- Integration: Pre-populate PersonaForm with defaults when creating new persona
+- Form fields:
+  - Default Provider, Default Model (cascading dropdown)
+  - Default Planner Persona, Default Coder Persona
+  - Default Project
+  - Auto-start Planning toggle
+  - Confirm Destructive Actions toggle
+  - UI Theme selector (dark/light/system - stores value, dark is current default)
+- Integration: Pre-populate forms with defaults (PersonaForm, TaskForm, etc.)
 
 ### Out of Scope (Future)
-- Default Planner/Coder personas for task creation
-- Theme selection (dark/light mode)
+- Full theme implementation (light mode CSS, system preference detection)
 - Auto-approve plans toggle
 - Import/export settings
+- Per-user settings (multi-user support)
 
 ## Relevant Files
 

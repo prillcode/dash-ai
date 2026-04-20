@@ -43,11 +43,24 @@
 - [ ] Add loading states
 - [ ] Error handling for save failures
 
+## Phase 05 — Theme Support (Future)
+
+**Objective:** Implement dark/light/system theme switching
+
+**Background:** Currently the app is hardcoded to dark theme. This phase adds full theme support.
+
+**Outputs:**
+- [ ] Create theme CSS variables for light mode
+- [ ] Add ThemeProvider context to React app
+- [ ] Persist theme choice in settings
+- [ ] "system" option detects OS preference
+- [ ] Apply theme class to root element
+
 ---
 
 ## Notes
 
-- Keep settings schema simple (key-value) for extensibility
+- Settings schema uses key-value for extensibility
 - Reuse existing `useModels()` hook for provider/model dropdowns
 - Settings are global (not per-user) since this is single-user app
-- Consider adding `createdAt` to settings table for audit
+- Theme is stored as "dark" | "light" | "system", but currently only "dark" is fully implemented
