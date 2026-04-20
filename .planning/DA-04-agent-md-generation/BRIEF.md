@@ -1,4 +1,4 @@
-# ID-02 — Agent.md Generation for Projects
+# DA-04 — Agent.md Generation for Projects
 
 ## Objective
 
@@ -22,7 +22,7 @@ Example Agent.md contents:
 ### In Scope (MVP)
 - "Generate Agent.md" button on Project page
 - Backend analysis of project structure (package.json, tsconfig.json, README, directory structure)
-- LLM call using default provider/model from Settings (ID-01)
+- LLM call using default provider/model from Settings (DA-03)
 - Save Agent.md to project root directory (filesystem)
 - Scrollable markdown viewer on Project page
 - Re-generate button with warning: "Existing Agent.md will be overwritten"
@@ -40,7 +40,7 @@ Example Agent.md contents:
 2. **Filesystem storage** — Always read from/write to `{project_path}/Agent.md`
 3. **View-only in UI** — Read-only markdown viewer, no editing
 4. **Overwrite warning** — Re-generate warns user: "Existing Agent.md will be overwritten"
-5. **Uses Settings defaults** — LLM provider/model from App Settings (ID-01)
+5. **Uses Settings defaults** — LLM provider/model from App Settings (DA-03)
 6. **Concise output** — Prompt asks LLM to keep it brief and focused
 
 ## Relevant Files
@@ -63,5 +63,5 @@ Example Agent.md contents:
 
 ## Dependencies
 
-- **ID-01 (App Settings)** — Uses default provider/model from settings
+- **DA-03 (App Settings)** — Uses default provider/model from settings
 - Pi SDK skills available for LLM calls

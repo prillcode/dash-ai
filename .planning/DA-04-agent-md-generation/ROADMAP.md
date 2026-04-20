@@ -1,4 +1,4 @@
-# ID-02 — Agent.md Generation — ROADMAP
+# DA-04 — Agent.md Generation — ROADMAP
 
 ## Phase 01 — Backend Analysis & Generation Service
 
@@ -8,7 +8,7 @@
 - [ ] `packages/server/src/services/agentMdService.ts` — analysis + generation logic
 - [ ] Project structure analysis (read package.json, tsconfig.json, README, list directories)
 - [ ] LLM prompt construction (ask for concise tech stack, conventions, architecture)
-- [ ] Use default provider/model from Settings (depends on ID-01)
+- [ ] Use default provider/model from Settings (depends on DA-03)
 - [ ] Save generated content to `{project_path}/Agent.md`
 - [ ] Error handling for file system issues
 
@@ -59,7 +59,7 @@
 
 ## Dependencies
 
-- **ID-01 (App Settings)** — Uses default provider/model
+- **DA-03 (App Settings)** — Uses default provider/model
 - **Pi SDK** — For LLM generation
 
 ## Notes
