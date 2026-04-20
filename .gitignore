@@ -31,7 +31,7 @@ Thumbs.db
 *.db-journal
 
 # Dash AI specific
-packages/server/src/db/migrations/
+# NOTE: Do NOT ignore migrations/ - schema changes must be version controlled
 packages/client/dist/
 .turbo/
 
