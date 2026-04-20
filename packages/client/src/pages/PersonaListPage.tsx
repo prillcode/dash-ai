@@ -45,7 +45,7 @@ export function PersonaListPage() {
       {!personas || personas.length === 0 ? (
         <EmptyState
           heading="No personas found"
-          description="Create a persona to define AI agent behavior"
+          description="Create a persona to define AI agent behavior. Set default personas in Settings for quicker task creation."
           action={<Button onClick={() => navigate("/personas/new")}>Create Persona</Button>}
         />
       ) : (

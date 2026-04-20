@@ -39,7 +39,7 @@ export function ProjectListPage() {
       {!projects || projects.length === 0 ? (
         <EmptyState
           heading="No projects yet"
-          description="Add your first project to get started"
+          description="Add your first project to get started. Set a default project in Settings for quicker task creation."
           action={<Button onClick={() => navigate("/projects/new")}>Add Project</Button>}
         />
       ) : (
@@ -67,6 +67,13 @@ export function ProjectListPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => navigate(`/tasks/new?projectId=${project.id}`)}
+                    title="Create a new task for this project"
+                  >
+                    + Task
+                  </Button>
                   <Button
                     variant="ghost"
                     onClick={() => navigate(`/projects/${project.id}/edit`)}
