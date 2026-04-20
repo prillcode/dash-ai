@@ -4,8 +4,9 @@ import { cors } from "hono/cors"
 import { logger } from "hono/logger"
 import { serveStatic } from "@hono/node-server/serve-static"
 import { readFileSync, existsSync } from "fs"
-import { join } from "path"
+import { dirname, join, resolve } from "path"
 import { homedir } from "os"
+import { fileURLToPath } from "url"
 import { personasRouter } from "./routes/personas"
 import { tasksRouter } from "./routes/tasks"
 import { eventsRouter } from "./routes/events"
@@ -28,6 +29,26 @@ export interface AppOptions {
  * Create the shared Hono app with all middleware and routes registered.
  * Used by both the standalone server entry point and the embedded CLI server.
  */
+function getDefaultClientDistPath(): string {
+  if (process.env.CLIENT_DIST_PATH) {
+    return resolve(process.env.CLIENT_DIST_PATH.replace(/^~/, homedir()))
+  }
+
+  const currentDir = dirname(fileURLToPath(import.meta.url))
+
+  const candidates = [
+    // Running from packages/server/dist
+    resolve(currentDir, "../../client/dist"),
+    // Running from packages/server/src via tsx
+    resolve(currentDir, "../../client/dist"),
+    // Fallback for unexpected cwd-based launches
+    resolve(process.cwd(), "packages/client/dist"),
+    resolve(process.cwd(), "../client/dist"),
+  ]
+
+  return candidates.find((candidate) => existsSync(join(candidate, "index.html"))) ?? candidates[0]
+}
+
 export function createApp(options: AppOptions = {}): Hono {
   const {
     clientDistPath,
@@ -35,7 +56,7 @@ export function createApp(options: AppOptions = {}): Hono {
   } = options
 
   const app = new Hono()
-  const distPath = clientDistPath ?? join(process.cwd(), "../client/dist")
+  const distPath = clientDistPath ?? getDefaultClientDistPath()
 
   app.use("*", cors())
   app.use("*", logger())

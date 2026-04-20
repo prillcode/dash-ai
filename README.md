@@ -262,11 +262,23 @@ See `packages/cli/AGENT-USAGE.md` for complete CLI reference.
 
 ## Deployment
 
-### Production Build
+### Headless Linux / web deployment
+
+For headless Linux environments such as an SSH-only session, use the web or Docker deployment rather than Electron. Electron requires a desktop/GUI session.
+
+Build everything:
 
 ```bash
 pnpm build
 ```
+
+Start the production web app (server + built client served by the server):
+
+```bash
+pnpm start:web
+```
+
+The server listens on `PORT` (default `3000`) and serves both the API and the built React app.
 
 ### PM2
 
@@ -276,6 +288,31 @@ pm2 start packages/server/dist/index.js --name "dash-ai"
 pm2 save
 pm2 startup  # auto-start on system boot
 ```
+
+### Docker
+
+Build and run with Docker Compose:
+
+```bash
+docker compose up --build -d
+```
+
+Or build manually:
+
+```bash
+docker build --build-arg VITE_API_TOKEN=$VITE_API_TOKEN -t dash-ai:latest .
+docker run -d \
+  -p 3000:3000 \
+  -e API_TOKEN=$API_TOKEN \
+  -e VITE_API_TOKEN=$VITE_API_TOKEN \
+  -v dash-ai-data:/data \
+  dash-ai:latest
+```
+
+Notes:
+- `VITE_API_TOKEN` must match `API_TOKEN` when building/running the web app.
+- The Docker setup persists SQLite data in `/data/dashboard.db`.
+- For full planning/coding support in Docker, mount Pi auth/skills and any local repos the agent needs to access.
 
 ### Electron Packaging
 

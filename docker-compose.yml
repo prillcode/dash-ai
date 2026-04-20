@@ -1,0 +1,25 @@
+services:
+  dash-ai:
+    build:
+      context: .
+      args:
+        VITE_API_TOKEN: ${VITE_API_TOKEN}
+    image: dash-ai:latest
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      SQLITE_DB_PATH: /data/dashboard.db
+      PORT: 3000
+    volumes:
+      - dash-ai-data:/data
+      # Optional: mount Pi auth + skills for full planning/coding support inside the container
+      - ${HOME}/.pi:/root/.pi:ro
+      - ${HOME}/.agents:/root/.agents:ro
+      # Optional: mount local repos/workspaces and register projects using container paths
+      # - ./workspaces:/workspaces
+    restart: unless-stopped
+
+volumes:
+  dash-ai-data:

@@ -6,8 +6,11 @@
     "dev": "pnpm --parallel --stream --filter @dash-ai/server --filter @dash-ai/client dev",
     "dev:electron": "pnpm --filter dash-ai-electron dev",
     "build": "pnpm -r build",
+    "start:web": "pnpm --filter @dash-ai/server start",
     "db:generate": "pnpm --filter server db:generate",
-    "db:migrate": "pnpm --filter server db:migrate"
+    "db:migrate": "pnpm --filter server db:migrate",
+    "docker:build": "docker build --build-arg VITE_API_TOKEN=${VITE_API_TOKEN} -t dash-ai:latest .",
+    "docker:up": "docker compose up --build -d"
   },
   "devDependencies": {
     "esbuild": "^0.28.0",
