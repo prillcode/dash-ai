@@ -1,6 +1,7 @@
 import { Hono } from "hono"
 import { z } from "zod"
 import * as projectService from "../services/projectService"
+import * as agentMdService from "../services/agentMdService"
 
 export const projectsRouter = new Hono()
 
@@ -11,6 +12,9 @@ const projectSchema = z.object({
 })
 
 const projectUpdateSchema = projectSchema.partial()
+const generateAgentMdSchema = z.object({
+  overwrite: z.boolean().optional(),
+})
 
 projectsRouter.get("/", async (c) => {
   const activeOnly = c.req.query("activeOnly") !== "false"
@@ -53,6 +57,38 @@ projectsRouter.get("/:id", async (c) => {
   }
   
   return c.json(project)
+})
+
+projectsRouter.get("/:id/agent-md", async (c) => {
+  try {
+    const snapshot = await agentMdService.getAgentMd(c.req.param("id"))
+    return c.json(snapshot)
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : "Failed to load Agent.md" }, 404)
+  }
+})
+
+projectsRouter.post("/:id/generate-agent-md", async (c) => {
+  const body = await c.req.json().catch(() => ({}))
+  const parsed = generateAgentMdSchema.safeParse(body)
+
+  if (!parsed.success) {
+    return c.json({ error: "Validation failed", details: parsed.error.issues }, 400)
+  }
+
+  try {
+    const result = await agentMdService.generateAgentMd(c.req.param("id"), parsed.data)
+    return c.json(result, 201)
+  } catch (err) {
+    if (err instanceof agentMdService.AgentMdOverwriteRequiredError) {
+      return c.json({
+        error: err.message,
+        overwriteRequired: true,
+        path: err.filePath,
+      }, 409)
+    }
+    return c.json({ error: err instanceof Error ? err.message : "Failed to generate Agent.md" }, 400)
+  }
 })
 
 projectsRouter.patch("/:id", async (c) => {

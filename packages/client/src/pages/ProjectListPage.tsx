@@ -69,6 +69,13 @@ export function ProjectListPage() {
                 <div className="flex items-center gap-2">
                   <Button
                     variant="secondary"
+                    onClick={() => navigate(`/projects/${project.id}`)}
+                    title="View project details and Agent.md"
+                  >
+                    View
+                  </Button>
+                  <Button
+                    variant="secondary"
                     onClick={() => navigate(`/tasks/new?projectId=${project.id}`)}
                     title="Create a new task for this project"
                   >

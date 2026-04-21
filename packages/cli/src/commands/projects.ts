@@ -16,6 +16,17 @@ export interface Project {
   updatedAt: string
 }
 
+interface AgentMdResult {
+  exists: boolean
+  path: string
+  content?: string
+  updatedAt?: string
+  generated?: boolean
+  overwritten?: boolean
+  provider?: string
+  model?: string
+}
+
 export function registerProjectCommands(program: Command): void {
   const projects = program.command("projects").description("Manage projects")
 
@@ -121,6 +132,65 @@ export function registerProjectCommands(program: Command): void {
           console.log(`  Updated:     ${project.updatedAt.split("T")[0]}`)
         }
       } catch (err) {
+        handleError(err, ctx)
+      }
+    })
+
+  projects
+    .command("generate-agent-md <id>")
+    .description("Generate or overwrite Agent.md for a project")
+    .option("-f, --force", "overwrite existing Agent.md without prompting")
+    .option("--json", "output as JSON")
+    .option("--quiet", "suppress non-essential output")
+    .option("--no-color", "disable color output")
+    .option("--url <url>", "override DASH_AI_URL")
+    .option("--token <token>", "override DASH_AI_TOKEN")
+    .action(async (id, opts) => {
+      const ctx = getContext(opts)
+      try {
+        const result = await withClient(ctx, async (client) => {
+          return client.post<AgentMdResult>(`/api/projects/${id}/generate-agent-md`, {
+            overwrite: Boolean(opts.force),
+          })
+        })
+
+        if (ctx.json) {
+          console.log(JSON.stringify({ success: true, data: { result } }, null, 2))
+        } else {
+          console.log(chalk.green("✓"), `${result.overwritten ? "Re-generated" : "Generated"} Agent.md`)
+          console.log(`  Path:     ${result.path}`)
+          console.log(`  Model:    ${result.provider}/${result.model}`)
+        }
+      } catch (err) {
+        if (!opts.force && err instanceof ApiError && err.status === 409) {
+          const rl = createInterface({ input: process.stdin, output: process.stdout })
+          const answer = await new Promise<string>((res) =>
+            rl.question("Existing Agent.md will be overwritten. Continue? [y/N] ", (a) => {
+              rl.close()
+              res(a.trim().toLowerCase())
+            })
+          )
+          if (answer !== "y" && answer !== "yes") {
+            console.log("Aborted.")
+            process.exit(0)
+          }
+
+          const result = await withClient(ctx, async (client) => {
+            return client.post<AgentMdResult>(`/api/projects/${id}/generate-agent-md`, {
+              overwrite: true,
+            })
+          })
+
+          if (ctx.json) {
+            console.log(JSON.stringify({ success: true, data: { result } }, null, 2))
+          } else {
+            console.log(chalk.green("✓"), "Re-generated Agent.md")
+            console.log(`  Path:     ${result.path}`)
+            console.log(`  Model:    ${result.provider}/${result.model}`)
+          }
+          return
+        }
+
         handleError(err, ctx)
       }
     })

@@ -8,6 +8,7 @@ import {
   PersonaListPage,
   PersonaFormPage,
   ProjectListPage,
+  ProjectDetailPage,
   ProjectFormPage,
   SettingsPage,
 } from "./pages"
@@ -35,6 +36,7 @@ export function App() {
             <Route path="/personas/:id/edit" element={<PersonaFormPage />} />
             <Route path="/projects" element={<ProjectListPage />} />
             <Route path="/projects/new" element={<ProjectFormPage />} />
+            <Route path="/projects/:id" element={<ProjectDetailPage />} />
             <Route path="/projects/:id/edit" element={<ProjectFormPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>

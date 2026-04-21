@@ -1,6 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "./client"
-import type { Project, ProjectInput, PathValidationResult } from "../types/project"
+import type {
+  Project,
+  ProjectInput,
+  PathValidationResult,
+  AgentMdSnapshot,
+  GenerateAgentMdResult,
+} from "../types/project"
 
 export function useProjects(activeOnly = true) {
   return useQuery({
@@ -57,5 +63,31 @@ export function useDeleteProject() {
     mutationFn: (id: string) =>
       apiClient<void>(`/api/projects/${id}`, { method: "DELETE" }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["projects"] }),
+  })
+}
+
+export function useAgentMd(projectId: string, enabled = true) {
+  return useQuery({
+    queryKey: ["project-agent-md", projectId],
+    queryFn: () => apiClient<AgentMdSnapshot>(`/api/projects/${projectId}/agent-md`),
+    enabled,
+    staleTime: 10_000,
+    retry: false,
+  })
+}
+
+export function useGenerateAgentMd() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, overwrite }: { id: string; overwrite?: boolean }) =>
+      apiClient<GenerateAgentMdResult>(`/api/projects/${id}/generate-agent-md`, {
+        method: "POST",
+        body: JSON.stringify({ overwrite }),
+      }),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ["project-agent-md", id] })
+      queryClient.invalidateQueries({ queryKey: ["project", id] })
+      queryClient.invalidateQueries({ queryKey: ["projects"] })
+    },
   })
 }

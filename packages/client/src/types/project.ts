@@ -20,3 +20,17 @@ export interface PathValidationResult {
   resolvedPath: string
   error?: string
 }
+
+export interface AgentMdSnapshot {
+  exists: boolean
+  path: string
+  content?: string
+  updatedAt?: string
+}
+
+export interface GenerateAgentMdResult extends AgentMdSnapshot {
+  generated: boolean
+  overwritten: boolean
+  provider: string
+  model: string
+}
