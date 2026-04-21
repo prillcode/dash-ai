@@ -98,7 +98,7 @@ export function useIteratePlan() {
 
 export function usePlanDoc(
   taskId: string,
-  file: "BRIEF.md" | "ROADMAP.md" | "ISSUES.md",
+  file: "BRIEF.md" | "ROADMAP.md" | "EXECUTION.md" | "ISSUES.md",
   enabled: boolean
 ) {
   return useQuery({
@@ -120,6 +120,20 @@ export function useMarkReadyToCode() {
       apiClient<Task>(`/api/tasks/${taskId}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status: "READY_TO_CODE" }),
+      }),
+    onSuccess: (task) => {
+      queryClient.invalidateQueries({ queryKey: ["task", task.id] })
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+    },
+  })
+}
+
+export function useCancelTask() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiClient<Task>(`/api/tasks/${id}/cancel`, {
+        method: "POST",
       }),
     onSuccess: (task) => {
       queryClient.invalidateQueries({ queryKey: ["task", task.id] })

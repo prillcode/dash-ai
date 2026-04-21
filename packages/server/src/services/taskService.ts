@@ -5,6 +5,7 @@ import { tasks, TaskStatus } from "../db/schema"
 import { generateId } from "../utils/id"
 import { now } from "../utils/time"
 import { readFile, readdir } from "fs/promises"
+import { statSync } from "fs"
 import { existsSync } from "fs"
 import { join } from "path"
 import { execSync } from "child_process"
@@ -225,6 +226,42 @@ export async function readPlanDoc(
   }
 }
 
+export async function listExecutablePlanDocs(repoPath: string, planPath: string): Promise<string[]> {
+  if (!planPath) return []
+
+  const planningRoot = join(repoPath, ".planning")
+  const fullPath = join(planningRoot, planPath)
+  if (!existsSync(fullPath)) return []
+
+  try {
+    if (statSync(fullPath).isFile()) {
+      const fileName = planPath.split("/").pop() || ""
+      return fileName.endsWith("PLAN.md") || fileName === "EXECUTION.md" ? [planPath] : []
+    }
+
+    const results: string[] = []
+    const walk = async (dir: string, base: string): Promise<void> => {
+      const entries = await readdir(dir, { withFileTypes: true })
+      for (const entry of entries) {
+        const rel = base ? `${base}/${entry.name}` : entry.name
+        if (entry.isDirectory()) await walk(join(dir, entry.name), rel)
+        else if (entry.name.endsWith("PLAN.md") || entry.name === "EXECUTION.md") results.push(rel)
+      }
+    }
+
+    await walk(fullPath, "")
+    return results.sort((a, b) => a.localeCompare(b))
+  } catch {
+    return []
+  }
+}
+
+export async function hasExecutablePlan(repoPath: string, planPath: string | null | undefined): Promise<boolean> {
+  if (!planPath) return false
+  const docs = await listExecutablePlanDocs(repoPath, planPath)
+  return docs.length > 0
+}
+
 export interface ValidationResult {
   /** Whether the codebase shows signs that work was completed */
   likelyComplete: boolean
@@ -319,7 +356,7 @@ export async function validateTask(id: string): Promise<ValidationResult | null>
 
   // 4. Determine likely completion
   const hasCommits = recentCommits.length > 0
-  const hasPlanDocs = planDocsFound.some((f) => f.endsWith("BRIEF.md") || f.endsWith("ROADMAP.md") || f.includes("PLAN.md"))
+  const hasPlanDocs = planDocsFound.some((f) => f.endsWith("BRIEF.md") || f.endsWith("ROADMAP.md") || f.endsWith("EXECUTION.md") || f.includes("PLAN.md"))
   const likelyComplete = hasCommits || hasPlanDocs
 
   // 5. Summary

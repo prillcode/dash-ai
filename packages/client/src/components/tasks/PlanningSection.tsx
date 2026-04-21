@@ -71,6 +71,7 @@ export function PlanningSection({ task }: PlanningSectionProps) {
         <div className="space-y-2">
           <PlanDocViewer taskId={task.id} file="BRIEF.md" title="Brief" />
           <PlanDocViewer taskId={task.id} file="ROADMAP.md" title="Roadmap" />
+          <PlanDocViewer taskId={task.id} file="EXECUTION.md" title="Execution" />
         </div>
       )}
 

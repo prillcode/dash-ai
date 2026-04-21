@@ -57,6 +57,8 @@ export type EventPayload =
 export type EventType =
   | "STATUS_CHANGE"
   | "TOOL_CALL"
+  | "TOOL_START"
+  | "TOOL_END"
   | "AGENT_OUTPUT"
   | "ERROR"
   | "REVIEW_ACTION"

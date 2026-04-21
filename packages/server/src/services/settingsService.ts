@@ -52,6 +52,10 @@ export interface DefaultSettings {
 
   // Workflow automation
   autoStartPlanning?: boolean
+  planningMode?: "auto" | "fast" | "full"
+  planningAllowRelatedWorkItems?: boolean
+  planningThinkingLevel?: "low" | "medium" | "high"
+  codingThinkingLevel?: "low" | "medium" | "high"
 
   // UI preferences
   uiTheme?: "dark" | "light" | "system"
@@ -125,6 +129,10 @@ export async function getDefaultSettings(): Promise<DefaultSettings> {
     defaultCoderPersonaId: allSettings.defaultCoderPersonaId,
     defaultProjectId: allSettings.defaultProjectId,
     autoStartPlanning: allSettings.autoStartPlanning === "true",
+    planningMode: (allSettings.planningMode as "auto" | "fast" | "full") ?? "auto",
+    planningAllowRelatedWorkItems: allSettings.planningAllowRelatedWorkItems === "true",
+    planningThinkingLevel: (allSettings.planningThinkingLevel as "low" | "medium" | "high") ?? "medium",
+    codingThinkingLevel: (allSettings.codingThinkingLevel as "low" | "medium" | "high") ?? "medium",
     uiTheme: (allSettings.uiTheme as "dark" | "light" | "system") ?? "dark",
     confirmDestructiveActions:
       allSettings.confirmDestructiveActions === "true",

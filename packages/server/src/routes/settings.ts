@@ -19,6 +19,10 @@ const updateSettingsSchema = z.object({
 
   // Workflow automation
   autoStartPlanning: z.boolean().optional(),
+  planningMode: z.enum(["auto", "fast", "full"]).optional(),
+  planningAllowRelatedWorkItems: z.boolean().optional(),
+  planningThinkingLevel: z.enum(["low", "medium", "high"]).optional(),
+  codingThinkingLevel: z.enum(["low", "medium", "high"]).optional(),
 
   // UI preferences
   uiTheme: z.enum(["dark", "light", "system"]).optional(),
@@ -92,6 +96,10 @@ settingsRouter.patch("/", async (c) => {
     ...(parsed.data.defaultCoderPersonaId && { defaultCoderPersonaId: parsed.data.defaultCoderPersonaId }),
     ...(parsed.data.defaultProjectId && { defaultProjectId: parsed.data.defaultProjectId }),
     ...(parsed.data.autoStartPlanning !== undefined && { autoStartPlanning: parsed.data.autoStartPlanning }),
+    ...(parsed.data.planningMode && { planningMode: parsed.data.planningMode }),
+    ...(parsed.data.planningAllowRelatedWorkItems !== undefined && { planningAllowRelatedWorkItems: parsed.data.planningAllowRelatedWorkItems }),
+    ...(parsed.data.planningThinkingLevel && { planningThinkingLevel: parsed.data.planningThinkingLevel }),
+    ...(parsed.data.codingThinkingLevel && { codingThinkingLevel: parsed.data.codingThinkingLevel }),
     ...(parsed.data.uiTheme && { uiTheme: parsed.data.uiTheme }),
     ...(parsed.data.confirmDestructiveActions !== undefined && { confirmDestructiveActions: parsed.data.confirmDestructiveActions }),
     ...(parsed.data.agentMdPrompt !== undefined && { agentMdPrompt: parsed.data.agentMdPrompt }),

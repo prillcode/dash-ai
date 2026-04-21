@@ -4,7 +4,7 @@ import { Spinner } from "../ui"
 
 interface PlanDocViewerProps {
   taskId: string
-  file: "BRIEF.md" | "ROADMAP.md" | "ISSUES.md"
+  file: "BRIEF.md" | "ROADMAP.md" | "EXECUTION.md" | "ISSUES.md"
   title: string
 }
 

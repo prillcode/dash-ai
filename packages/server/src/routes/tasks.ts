@@ -128,6 +128,22 @@ tasksRouter.patch("/:id/status", async (c) => {
   if (!parsed.success) {
     return c.json({ error: "Validation failed", details: parsed.error.issues }, 400)
   }
+
+  const existing = await taskService.getTask(id)
+  if (!existing) {
+    return c.json({ error: "Task not found" }, 404)
+  }
+
+  if (parsed.data.status === TaskStatus.READY_TO_CODE) {
+    const hasExecutablePlan = await taskService.hasExecutablePlan(existing.repoPath, existing.planPath)
+    if (!hasExecutablePlan) {
+      return c.json({ error: "Task cannot start coding until an executable PLAN.md or EXECUTION.md exists in its plan directory" }, 400)
+    }
+  }
+
+  if (parsed.data.status === TaskStatus.DRAFT && [TaskStatus.QUEUED, TaskStatus.RUNNING].includes(existing.status as any)) {
+    return c.json({ error: "Use the cancel action for queued or running coding tasks" }, 400)
+  }
   
   const task = await taskService.updateTaskStatus(id, parsed.data.status, {
     reviewedBy: parsed.data.reviewedBy,
@@ -139,7 +155,7 @@ tasksRouter.patch("/:id/status", async (c) => {
   }
   
   await eventService.appendEvent(id, "STATUS_CHANGE", {
-    from: "manual",
+    from: existing.status,
     to: parsed.data.status,
   })
   
@@ -287,6 +303,45 @@ tasksRouter.post("/:id/review", async (c) => {
   return c.json({ taskId: id, review })
 })
 
+tasksRouter.post("/:id/cancel", async (c) => {
+  const id = c.req.param("id")
+  const task = await taskService.getTask(id)
+
+  if (!task) {
+    return c.json({ error: "Task not found" }, 404)
+  }
+
+  if (![TaskStatus.QUEUED, TaskStatus.RUNNING].includes(task.status as any)) {
+    return c.json({ error: "Only QUEUED or RUNNING tasks can be canceled" }, 400)
+  }
+
+  const { cancelCodingSession } = await import("../agent/sessionRegistry")
+  const wasAborted = task.status === TaskStatus.RUNNING ? cancelCodingSession(id) : false
+
+  const updated = await taskService.updateTaskStatus(id, TaskStatus.DRAFT, {
+    sessionId: null,
+    startedAt: null,
+    completedAt: null,
+    errorMessage: null,
+  })
+  if (!updated) {
+    return c.json({ error: "Failed to cancel task" }, 500)
+  }
+
+  await eventService.appendEvent(id, "STATUS_CHANGE", {
+    from: task.status,
+    to: TaskStatus.DRAFT,
+    message: wasAborted ? "coding session canceled by user" : "queued task canceled by user",
+  })
+
+  await eventService.appendEvent(id, "CODING_EVENT", {
+    status: "canceled",
+    message: wasAborted ? "Canceled active coding session" : "Canceled queued coding task",
+  })
+
+  return c.json(updated)
+})
+
 tasksRouter.post("/:id/retry", async (c) => {
   const id = c.req.param("id")
   const task = await taskService.getTask(id)
@@ -348,9 +403,9 @@ tasksRouter.get("/:id/plan-doc", async (c) => {
   const file = c.req.query("file")
 
   // Validate file param — only allow specific safe filenames
-  const allowedFiles = ["BRIEF.md", "ROADMAP.md", "ISSUES.md"]
+  const allowedFiles = ["BRIEF.md", "ROADMAP.md", "EXECUTION.md", "ISSUES.md"]
   if (!file || !allowedFiles.includes(file)) {
-    return c.json({ error: "Invalid file param. Allowed: BRIEF.md, ROADMAP.md, ISSUES.md" }, 400)
+    return c.json({ error: "Invalid file param. Allowed: BRIEF.md, ROADMAP.md, EXECUTION.md, ISSUES.md" }, 400)
   }
 
   const task = await taskService.getTask(id)

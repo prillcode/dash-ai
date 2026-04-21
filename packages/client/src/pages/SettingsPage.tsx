@@ -58,6 +58,10 @@ export function SettingsPage() {
     defaultCoderPersonaId: "",
     defaultProjectId: "",
     autoStartPlanning: false,
+    planningMode: "auto" as "auto" | "fast" | "full",
+    planningAllowRelatedWorkItems: false,
+    planningThinkingLevel: "medium" as "low" | "medium" | "high",
+    codingThinkingLevel: "medium" as "low" | "medium" | "high",
     uiTheme: "dark" as "dark" | "light" | "system",
     confirmDestructiveActions: true,
     agentMdPrompt: "",
@@ -77,6 +81,10 @@ export function SettingsPage() {
         defaultCoderPersonaId: settings.defaultCoderPersonaId || "",
         defaultProjectId: settings.defaultProjectId || "",
         autoStartPlanning: settings.autoStartPlanning || false,
+        planningMode: settings.planningMode || "auto",
+        planningAllowRelatedWorkItems: settings.planningAllowRelatedWorkItems || false,
+        planningThinkingLevel: settings.planningThinkingLevel || "medium",
+        codingThinkingLevel: settings.codingThinkingLevel || "medium",
         uiTheme: settings.uiTheme || "dark",
         confirmDestructiveActions: settings.confirmDestructiveActions !== false,
         agentMdPrompt: settings.agentMdPrompt || "",
@@ -127,6 +135,10 @@ export function SettingsPage() {
         defaultCoderPersonaId: formState.defaultCoderPersonaId || undefined,
         defaultProjectId: formState.defaultProjectId || undefined,
         autoStartPlanning: formState.autoStartPlanning,
+        planningMode: formState.planningMode,
+        planningAllowRelatedWorkItems: formState.planningAllowRelatedWorkItems,
+        planningThinkingLevel: formState.planningThinkingLevel,
+        codingThinkingLevel: formState.codingThinkingLevel,
         uiTheme: formState.uiTheme,
         confirmDestructiveActions: formState.confirmDestructiveActions,
         agentMdPrompt: formState.agentMdPrompt || undefined,
@@ -302,6 +314,66 @@ export function SettingsPage() {
           </label>
           <p className="text-xs text-subtle ml-7">
             Immediately triggers AI planning after task creation, skipping the draft state.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-muted">Planning Mode</label>
+              <select
+                value={formState.planningMode}
+                onChange={(e) => handleChange("planningMode", e.target.value as "auto" | "fast" | "full")}
+                className="form-input w-full px-3 py-2 text-sm"
+              >
+                <option value="auto">Auto</option>
+                <option value="fast">Fast</option>
+                <option value="full">Full</option>
+              </select>
+              <p className="text-xs text-subtle">
+                Auto uses a lightweight scaffold for small tasks and full phased planning for larger work.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-muted">Planning Thinking Level</label>
+              <select
+                value={formState.planningThinkingLevel}
+                onChange={(e) => handleChange("planningThinkingLevel", e.target.value as "low" | "medium" | "high")}
+                className="form-input w-full px-3 py-2 text-sm"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-muted">Coding Thinking Level</label>
+            <select
+              value={formState.codingThinkingLevel}
+              onChange={(e) => handleChange("codingThinkingLevel", e.target.value as "low" | "medium" | "high")}
+              className="form-input w-full px-3 py-2 text-sm"
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+            <p className="text-xs text-subtle">
+              Controls how much reasoning the coding runner uses before executing a selected plan.
+            </p>
+          </div>
+
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formState.planningAllowRelatedWorkItems}
+              onChange={(e) => handleChange("planningAllowRelatedWorkItems", e.target.checked)}
+              className="w-4 h-4 rounded border-border text-accent focus:ring-accent"
+            />
+            <span className="text-sm text-text">Allow planner to inspect related work items</span>
+          </label>
+          <p className="text-xs text-subtle ml-7">
+            Disabled by default so normal planning stays inside the target work item instead of reading unrelated `.planning/*` directories.
           </p>
         </section>
 

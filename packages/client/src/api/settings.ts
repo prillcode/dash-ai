@@ -8,6 +8,10 @@ export interface Settings {
   defaultCoderPersonaId?: string
   defaultProjectId?: string
   autoStartPlanning?: boolean
+  planningMode?: "auto" | "fast" | "full"
+  planningAllowRelatedWorkItems?: boolean
+  planningThinkingLevel?: "low" | "medium" | "high"
+  codingThinkingLevel?: "low" | "medium" | "high"
   uiTheme?: "dark" | "light" | "system"
   confirmDestructiveActions?: boolean
   agentMdPrompt?: string

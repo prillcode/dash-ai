@@ -56,6 +56,28 @@ function renderEventContent(event: TaskEvent): React.ReactNode {
         </div>
       )
     }
+    case "TOOL_START": {
+      const payload = event.payload as { toolName?: string }
+      return (
+        <div className="text-sm flex items-center gap-2">
+          <span className="text-yellow-400">⟳</span>
+          <span className="font-medium">Tool:</span>
+          <span className="text-purple font-mono">{payload.toolName || "unknown"}</span>
+        </div>
+      )
+    }
+    case "TOOL_END": {
+      const payload = event.payload as { toolName?: string; isError?: boolean }
+      return (
+        <div className="text-sm flex items-center gap-2">
+          <span className={payload.isError ? "text-danger" : "text-success"}>
+            {payload.isError ? "✗" : "✓"}
+          </span>
+          <span className="font-medium">Tool:</span>
+          <span className="text-purple font-mono">{payload.toolName || "unknown"}</span>
+        </div>
+      )
+    }
     case "REVIEW_ACTION": {
       const payload = event.payload as {
         action: string
@@ -79,6 +101,14 @@ function renderEventContent(event: TaskEvent): React.ReactNode {
       const status = payload.status as string | undefined
       const message = payload.message as string | undefined
       const sessionId = payload.sessionId as string | undefined
+      const workItemDir = payload.workItemDir as string | undefined
+      const selectedPlanFile = payload.selectedPlanFile as string | undefined
+      const planningMode = payload.planningMode as string | undefined
+      const durationMs = payload.durationMs as number | undefined
+      const turnCount = payload.turnCount as number | undefined
+      const toolStartCount = payload.toolStartCount as number | undefined
+      const detectedPlanDir = payload.detectedPlanDir as string | undefined
+      const expectedTargetPrefix = payload.expectedTargetPrefix as string | undefined
 
       const label = event.eventType === "PLANNING_EVENT" ? "Planning" : "Coding"
 
@@ -142,6 +172,53 @@ function renderEventContent(event: TaskEvent): React.ReactNode {
         "question.answered": "Answered interactive question",
         "session.idle": "Session complete",
         completed: "Done",
+      }
+
+      if (status === "targeting") {
+        return (
+          <div className="text-sm text-muted space-y-1">
+            <div><span className="font-medium">{label} target:</span> {expectedTargetPrefix || "(auto)"}</div>
+            {planningMode && <div className="text-xs">mode: {planningMode}</div>}
+          </div>
+        )
+      }
+
+      if (status === "target_resolved") {
+        return (
+          <div className="text-sm text-muted">
+            <span className="font-medium">{label} target resolved:</span>{" "}
+            <code className="text-accent">.planning/{detectedPlanDir}</code>
+          </div>
+        )
+      }
+
+      if (status === "launching") {
+        return (
+          <div className="text-sm text-muted space-y-1">
+            <div>
+              <span className="font-medium">{label} launching</span>
+              {planningMode && <span className="ml-2 text-xs">mode: {planningMode}</span>}
+            </div>
+            {workItemDir && <div className="text-xs">work item: <code>{workItemDir}</code></div>}
+            {selectedPlanFile && <div className="text-xs">selected doc: <code>{selectedPlanFile}</code></div>}
+            {sessionId && <div className="text-xs text-subtle">session {String(sessionId).slice(0, 12)}…</div>}
+          </div>
+        )
+      }
+
+      if (status === "summary") {
+        return (
+          <div className="text-sm text-muted space-y-1">
+            <div><span className="font-medium">{label} summary:</span> {message || "complete"}</div>
+            <div className="text-xs">
+              {durationMs !== undefined && <span>{Math.round(durationMs / 100) / 10}s</span>}
+              {turnCount !== undefined && <span className="ml-2">turns: {turnCount}</span>}
+              {toolStartCount !== undefined && <span className="ml-2">tools: {toolStartCount}</span>}
+            </div>
+            {workItemDir && <div className="text-xs">work item: <code>{workItemDir}</code></div>}
+            {selectedPlanFile && <div className="text-xs">selected doc: <code>{selectedPlanFile}</code></div>}
+          </div>
+        )
       }
 
       if (status && milestoneMessages[status]) {

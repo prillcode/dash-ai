@@ -1,5 +1,5 @@
 import { Button } from "../ui"
-import { useStartPlanning, useUpdateTaskStatus, useRetryTask } from "../../api/tasks"
+import { useStartPlanning, useUpdateTaskStatus, useRetryTask, useCancelTask } from "../../api/tasks"
 import type { Task } from "../../types/task"
 import { TaskStatus } from "../../types/task"
 
@@ -10,7 +10,10 @@ interface TaskActionBarProps {
 export function TaskActionBar({ task }: TaskActionBarProps) {
   const startPlanning = useStartPlanning()
   const updateStatus = useUpdateTaskStatus()
+  const cancelTask = useCancelTask()
   const retryTask = useRetryTask()
+
+  const canStartCoding = Boolean(task.planPath)
 
   const handleStartPlanning = () => {
     if (window.confirm("Start planning with " + task.planningPersonaName + "?")) {
@@ -45,15 +48,6 @@ export function TaskActionBar({ task }: TaskActionBarProps) {
     })
   }
 
-  const handleCancel = () => {
-    if (window.confirm("Cancel this task and reset to DRAFT?")) {
-      updateStatus.mutate({
-        id: task.id,
-        status: TaskStatus.DRAFT,
-      })
-    }
-  }
-
   // DRAFT tasks
   if (task.status === TaskStatus.DRAFT) {
     if (task.planningPersonaId) {
@@ -69,7 +63,8 @@ export function TaskActionBar({ task }: TaskActionBarProps) {
           <Button
             variant="secondary"
             onClick={handleStartCoding}
-            disabled={updateStatus.isPending}
+            disabled={updateStatus.isPending || !canStartCoding}
+            title={canStartCoding ? undefined : "Create an executable plan before starting coding"}
           >
             Skip Planning & Start Coding
           </Button>
@@ -81,7 +76,8 @@ export function TaskActionBar({ task }: TaskActionBarProps) {
           <Button
             variant="primary"
             onClick={handleStartCoding}
-            disabled={updateStatus.isPending}
+            disabled={updateStatus.isPending || !canStartCoding}
+            title={canStartCoding ? undefined : "Create an executable plan before starting coding"}
           >
             Start Coding
           </Button>
@@ -116,10 +112,14 @@ export function TaskActionBar({ task }: TaskActionBarProps) {
       <div className="flex items-center gap-2">
         <Button
           variant="destructive"
-          onClick={handleCancel}
-          disabled={updateStatus.isPending}
+          onClick={() => {
+            if (window.confirm("Cancel this coding task?")) {
+              cancelTask.mutate(task.id)
+            }
+          }}
+          disabled={cancelTask.isPending}
         >
-          Cancel
+          {cancelTask.isPending ? "Canceling..." : "Cancel"}
         </Button>
       </div>
     )

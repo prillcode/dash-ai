@@ -41,8 +41,18 @@ async function runTaskSession(task: { id: string; title: string; description: st
       },
       async (type, payload) => {
         await eventService.appendEvent(task.id, type as EventType, payload as any)
+      },
+      {
+        onSessionReady: async ({ sessionId }) => {
+          await taskService.updateTaskStatus(task.id, TaskStatus.RUNNING, { sessionId })
+        },
       }
     )
+
+    const latest = await taskService.getTask(task.id)
+    if (!latest || latest.status === TaskStatus.DRAFT) {
+      return
+    }
 
     if (result.success) {
       await taskService.updateTaskStatus(task.id, TaskStatus.AWAITING_REVIEW, {
@@ -52,7 +62,12 @@ async function runTaskSession(task: { id: string; title: string; description: st
         completedAt: new Date().toISOString(),
       })
     } else {
-      await taskService.markTaskFailed(task.id, result.errorMessage || "Session failed")
+      await taskService.updateTaskStatus(task.id, TaskStatus.FAILED, {
+        outputLog: result.logPath,
+        sessionId: result.sessionId || null,
+        errorMessage: result.errorMessage || (result.noChanges ? "Coding session completed with no code changes" : "Session failed"),
+        completedAt: new Date().toISOString(),
+      })
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
