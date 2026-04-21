@@ -13,8 +13,8 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.0.0",
-    "@mariozechner/pi-ai": "^0.67.68",
-    "@mariozechner/pi-coding-agent": "^0.67.68",
+    "@mariozechner/pi-ai": "0.67.68",
+    "@mariozechner/pi-coding-agent": "0.67.68",
     "@sinclair/typebox": "^0.34.49",
     "better-sqlite3": "^12.6.2",
     "dotenv": "^17.3.1",

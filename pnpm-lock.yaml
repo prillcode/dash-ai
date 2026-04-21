@@ -144,10 +144,10 @@ importers:
         specifier: ^1.0.0
         version: 1.19.9(hono@4.11.10)
       '@mariozechner/pi-ai':
-        specifier: ^0.67.68
+        specifier: 0.67.68
         version: 0.67.68(ws@8.19.0)(zod@3.25.76)
       '@mariozechner/pi-coding-agent':
-        specifier: ^0.67.68
+        specifier: 0.67.68
         version: 0.67.68(ws@8.19.0)(zod@3.25.76)
       '@sinclair/typebox':
         specifier: ^0.34.49

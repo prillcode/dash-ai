@@ -18,6 +18,18 @@ import { authMiddleware } from "./middleware/auth"
 import { loggerMiddleware } from "./middleware/logger"
 import { getModelRegistry } from "./agent/piSession"
 
+function getPiAgentDir(): string {
+  return process.env.PI_AGENT_DIR
+    ? resolve(process.env.PI_AGENT_DIR.replace(/^~/, homedir()))
+    : join(homedir(), ".pi", "agent")
+}
+
+function getSkillsDirCandidates(): string[] {
+  const piSkills = join(getPiAgentDir(), "skills")
+  const legacySkills = join(homedir(), ".agents", "skills")
+  return [piSkills, legacySkills]
+}
+
 export interface AppOptions {
   /** Path to the client dist directory (for serving the React UI). */
   clientDistPath?: string
@@ -97,13 +109,14 @@ export function createApp(options: AppOptions = {}): Hono {
  */
 export function runStartupChecks(): void {
   const requiredSkills = ["start-work-begin", "start-work-plan", "start-work-run"]
+  const skillDirs = getSkillsDirCandidates()
   const missing = requiredSkills.filter(
-    (s) => !existsSync(join(homedir(), ".agents", "skills", s))
+    (skill) => !skillDirs.some((dir) => existsSync(join(dir, skill)))
   )
   if (missing.length > 0) {
     console.warn(`⚠️  Missing pi-native skills: ${missing.join(", ")}`)
     console.warn("    Planning and coding tasks will fail until skills are installed.")
-    console.warn("    Expected location: ~/.agents/skills/")
+    console.warn(`    Expected location: ${skillDirs.join(" or ")}`)
   }
 
   try {
