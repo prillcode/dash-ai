@@ -26,20 +26,11 @@ A self-hosted, planning-first AI kanban board for managing coding tasks across l
 
 Dash AI uses the **Pi SDK** for AI provider management. API keys are loaded from:
 
-### Option 1: Pi CLI Auth Storage (Recommended)
+### Pi CLI Auth Storage
 ```bash
 # Stored in ~/.pi/agent/auth.json
 pi login                    # For OAuth providers
 pi config set-api-key       # For API key providers
-```
-
-### Option 2: Environment Variables
-```bash
-# Web/server development: add to repo-root .env or your shell profile
-export OPENAI_API_KEY=sk-...
-export ANTHROPIC_API_KEY=sk-ant-...
-export DEEPSEEK_API_KEY=...
-# etc.
 ```
 
 For the Electron app, environment variables can also be loaded from `~/.dash-ai/.env`.
@@ -48,98 +39,20 @@ For the Electron app, environment variables can also be loaded from `~/.dash-ai/
 
 ## Quick Start
 
-### 1. Clone and install
+For the fastest path to get Dash AI running after cloning the repo, see:
 
-```bash
-git clone <repository-url>
-cd dash-ai
-pnpm install
-```
+- [QUICK-START.md](./QUICK-START.md)
 
-### 2. Configure environment
+It covers:
+- dependency install
+- repo-root `.env` setup
+- Pi auth/skills requirements
+- database migration
+- `pnpm start:web`
+- SSH tunnel access for remote Linux hosts
+- PM2 for keeping Dash AI running
 
-```bash
-cp .env.example .env
-```
-
-Edit the repo-root `.env`:
-
-```bash
-# Required: secret token for API auth
-# Generate with: openssl rand -hex 32
-API_TOKEN=your-secret-token-here
-
-# Required for the Vite client; must match API_TOKEN
-VITE_API_TOKEN=your-secret-token-here
-
-# Optional
-PORT=3000
-MAX_CONCURRENT_SESSIONS=3
-```
-
-Notes:
-- The standalone server loads environment variables from the repo-root `.env`.
-- `packages/server/.env` is not used by the normal web development flow.
-- Electron loads its own environment from `~/.dash-ai/.env`.
-
-### 3. Configure your AI provider(s)
-
-**Via Pi CLI:**
-```bash
-# OAuth-capable providers
-pi login
-
-# API-key providers
-pi config set-api-key
-```
-
-**Or via environment variables:** add provider keys to the repo-root `.env` (web/server) or `~/.dash-ai/.env` (Electron).
-
-Keys stored in `~/.pi/agent/auth.json` are also automatically detected by Dash AI.
-
-### 4. Apply migrations
-
-```bash
-pnpm db:migrate
-```
-
-Database is created at `~/.dash-ai/dashboard.db` (SQLite, local file).
-
-**Important:** never run `pnpm db:generate` — see `AGENTS.md` for migration rules.
-
-### 5. Start development
-
-**Option A: Web app (recommended for normal development)**
-```bash
-pnpm dev
-```
-
-This runs the standalone API server and the Vite React client in parallel from one terminal.
-
-- Client: http://localhost:5173
-- Server: http://localhost:3000
-
-Equivalent manual commands if needed:
-```bash
-# Terminal 1: API Server
-pnpm --filter server dev
-
-# Terminal 2: React Client
-pnpm --filter client dev
-```
-
-**Option B: Electron desktop app**
-```bash
-pnpm dev:electron
-```
-
-Electron uses the same React UI from `packages/client`, but runs it inside a desktop shell and starts an embedded API server automatically. It loads provider/API-key environment variables from `~/.dash-ai/.env`.
-
-**Option C: CLI**
-```bash
-cd packages/cli
-node dist/index.js --help
-```
+For additional development workflows, packaging, and deployment details, continue below in this README.
 
 ## Package roles
 
@@ -278,7 +191,7 @@ Start the production web app (server + built client served by the server):
 pnpm start:web
 ```
 
-The server listens on `PORT` (default `3000`) and serves both the API and the built React app.
+The server listens on `PORT` (the repo `.env.example` currently uses `3210`) and serves both the API and the built React app.
 
 ### PM2
 
@@ -313,6 +226,7 @@ Notes:
 - `VITE_API_TOKEN` must match `API_TOKEN` when building/running the web app.
 - The Docker setup persists SQLite data in `/data/dashboard.db`.
 - Docker sets `DEPLOYMENT_MODE=docker` and `PROJECTS_ROOT=/projects` so the UI can guide users toward container-visible repo paths.
+- Docker mounts host `${HOME}/dev` to container `/projects`, so register repos in the UI as `/projects/<repo-name>` when running in Docker.
 - For full planning/coding support in Docker, mount Pi auth/skills and any local repos the agent needs to access.
 
 ### Electron Packaging
