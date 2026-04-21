@@ -87,6 +87,13 @@ projectsRouter.post("/:id/generate-agent-md", async (c) => {
         path: err.filePath,
       }, 409)
     }
+    if (err instanceof agentMdService.AgentMdGenerationError) {
+      console.error("Agent.md generation failed", err.diagnostics)
+      return c.json({
+        error: err.message,
+        diagnostics: err.diagnostics,
+      }, 400)
+    }
     return c.json({ error: err instanceof Error ? err.message : "Failed to generate Agent.md" }, 400)
   }
 })

@@ -158,8 +158,13 @@ Then stop the conflicting process or choose another `PORT` in `.env`.
 If the app is running on Linux and your browser is on Windows, use an SSH tunnel:
 
 ```bash
-ssh -L 43210:localhost:3210 <your-ssh-host>
+ssh -N -f -L 43210:localhost:3210 awslinuxacp
 ```
+Flag breakdown:
+
+- `-N` — don't execute a remote command; just forward ports and sit quietly
+- `-L` 43210:localhost:3210 — local port 43210 → remote localhost:3210
+- `awslinuxacp` — your SSH host alias
 
 Then browse to:
 

@@ -112,6 +112,33 @@ export function PersonaForm({ initialData, onSubmit, isLoading }: PersonaFormPro
     }
   }, [initialData, reset])
 
+  useEffect(() => {
+    if (!modelsData || initialData) return
+
+    const configuredProviders = modelsData.providers.filter(
+      (p) => modelsData.authMethods[p.id]?.configured
+    )
+    if (configuredProviders.length === 0) return
+
+    const currentProvider = watch("provider")
+    const selectedProvider = configuredProviders.find((p) => p.id === currentProvider)
+
+    if (!selectedProvider) {
+      const fallbackProvider = configuredProviders[0]
+      setValue("provider", fallbackProvider.id, { shouldDirty: false, shouldValidate: true })
+      if (fallbackProvider.models[0]) {
+        setValue("model", fallbackProvider.models[0].id, { shouldDirty: false, shouldValidate: true })
+      }
+      return
+    }
+
+    const currentModel = watch("model")
+    const selectedModel = selectedProvider.models.find((m) => m.id === currentModel)
+    if (!selectedModel && selectedProvider.models[0]) {
+      setValue("model", selectedProvider.models[0].id, { shouldDirty: false, shouldValidate: true })
+    }
+  }, [modelsData, initialData, setValue, watch])
+
   const currentType = watch("personaType") ?? "custom"
 
   function handleTypeChange(type: string) {

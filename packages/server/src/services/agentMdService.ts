@@ -23,6 +23,16 @@ export class AgentMdOverwriteRequiredError extends Error {
   }
 }
 
+export class AgentMdGenerationError extends Error {
+  constructor(
+    message: string,
+    public diagnostics: AgentMdGenerationDiagnostics
+  ) {
+    super(message)
+    this.name = "AgentMdGenerationError"
+  }
+}
+
 export interface AgentMdSnapshot {
   exists: boolean
   path: string
@@ -35,6 +45,22 @@ export interface GenerateAgentMdResult extends AgentMdSnapshot {
   overwritten: boolean
   provider: string
   model: string
+}
+
+export interface AgentMdGenerationDiagnostics {
+  projectPath: string
+  outputPath: string
+  model: string
+  provider: string
+  assistantTextPreview?: string
+  assistantTextLength: number
+  fallbackWriteAttempted: boolean
+  fallbackWriteSucceeded: boolean
+  fileExistsAfterSession: boolean
+  fileExistsAfterFallback: boolean
+  promptResolved: boolean
+  promptError?: string
+  eventTrace: string[]
 }
 
 function getAgentMdPath(projectPath: string): string {
@@ -164,6 +190,7 @@ export async function generateAgentMd(
   const target = await resolveGenerationTarget(settings)
   const model = await resolveModel(target.provider, target.model)
   const projectAnalysis = await buildProjectAnalysis(project.resolvedPath)
+  const outputPath = getAgentMdPath(project.resolvedPath)
 
   const loader = new DefaultResourceLoader({
     cwd: project.resolvedPath,
@@ -183,9 +210,45 @@ export async function generateAgentMd(
   })
 
   let assistantText = ""
+  let fallbackWriteAttempted = false
+  let fallbackWriteSucceeded = false
+  let promptResolved = false
+  let promptError: string | undefined
+  const eventTrace: string[] = []
+  const pushTrace = (entry: string) => {
+    if (eventTrace.length < 50) eventTrace.push(entry)
+  }
+
   session.subscribe((event) => {
-    if (event.type === "message_update" && (event as any).assistantMessageEvent?.type === "text_delta") {
-      assistantText += (event as any).assistantMessageEvent.delta || ""
+    switch (event.type) {
+      case "message_update": {
+        const assistantEvent = (event as any).assistantMessageEvent
+        if (assistantEvent?.type === "text_delta") {
+          assistantText += assistantEvent.delta || ""
+          pushTrace(`message_update:text_delta:${String(assistantEvent.delta || "").length}`)
+        } else {
+          pushTrace(`message_update:${assistantEvent?.type || "unknown"}`)
+        }
+        break
+      }
+      case "tool_execution_start":
+        pushTrace(`tool_start:${(event as any).toolName || "unknown"}`)
+        break
+      case "tool_execution_end":
+        pushTrace(`tool_end:${(event as any).toolName || "unknown"}:${(event as any).isError ? "error" : "ok"}`)
+        break
+      case "turn_start":
+        pushTrace(`turn_start:${(event as any).turnIndex ?? "?"}`)
+        break
+      case "turn_end":
+        pushTrace(`turn_end:${(event as any).turnIndex ?? "?"}`)
+        break
+      case "agent_end":
+        pushTrace("agent_end")
+        break
+      default:
+        pushTrace(`event:${event.type}`)
+        break
     }
   })
 
@@ -215,12 +278,19 @@ export async function generateAgentMd(
         "If you choose not to use tools, output only the final Agent.md markdown content with no surrounding commentary.",
       ].join("\n")
     )
+    promptResolved = true
+  } catch (error) {
+    promptError = error instanceof Error ? error.message : String(error)
+    pushTrace(`prompt_error:${promptError}`)
+    throw error
   } finally {
     clearTimeout(timeoutId)
     session.dispose()
   }
 
   let after = await readSnapshot(project.resolvedPath)
+  const fileExistsAfterSession = after.exists && Boolean(after.content?.trim())
+
   if ((!after.exists || !after.content?.trim()) && assistantText.trim()) {
     const cleaned = assistantText
       .trim()
@@ -229,13 +299,32 @@ export async function generateAgentMd(
       .trim()
 
     if (cleaned) {
-      await writeFile(getAgentMdPath(project.resolvedPath), `${cleaned}\n`, "utf8")
+      fallbackWriteAttempted = true
+      await writeFile(outputPath, `${cleaned}\n`, "utf8")
       after = await readSnapshot(project.resolvedPath)
+      fallbackWriteSucceeded = after.exists && Boolean(after.content?.trim())
     }
   }
 
   if (!after.exists || !after.content?.trim()) {
-    throw new Error("Agent.md generation completed but no Agent.md file was written")
+    throw new AgentMdGenerationError(
+      "Agent.md generation completed but no Agent.md file was written",
+      {
+        projectPath: project.resolvedPath,
+        outputPath,
+        model: model.id,
+        provider: model.provider,
+        assistantTextPreview: assistantText.trim().slice(0, 1000) || undefined,
+        assistantTextLength: assistantText.length,
+        fallbackWriteAttempted,
+        fallbackWriteSucceeded,
+        fileExistsAfterSession,
+        fileExistsAfterFallback: after.exists && Boolean(after.content?.trim()),
+        promptResolved,
+        promptError,
+        eventTrace,
+      }
+    )
   }
 
   return {
