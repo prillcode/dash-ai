@@ -53,13 +53,15 @@ Add a true coding-iteration workflow to Dash AI so users can respond to partial 
 - This work is intentionally separate from DA-06, which focuses on coding runner safety and lifecycle correctness.
 
 ## Proposed Approach
-1. Add a coding iteration/rework flow that captures user feedback and re-queues the task for continued coding.
-2. Introduce clearer post-coding actions/states for partial progress, requested changes, blocked work, or continue-with-feedback.
-3. Update codingRunner prompts so iteration runs use prior context, current repo state, selected plan, and user feedback coherently.
-4. Replace the current raw diff preview with a changed-files summary (file path + added/deleted counts), while still preserving underlying diff artifacts on disk if needed.
-5. Keep the UX honest about the fact that code may already be in the repo before a task is “approved.”
+1. Split plan approval from execution so `READY_TO_CODE` means “approved and eligible” rather than “start immediately.”
+2. Add a coding iteration/rework flow that captures user feedback and re-queues the task for continued coding.
+3. Introduce clearer post-coding actions/states for partial progress, requested changes, blocked work, or continue-with-feedback.
+4. Update codingRunner prompts so iteration runs use prior context, current repo state, selected plan, and user feedback coherently.
+5. Replace the current raw diff preview with a changed-files summary (file path + added/deleted counts), while still preserving underlying diff artifacts on disk if needed.
+6. Keep the UX honest about the fact that code may already be in the repo before a task is “approved.”
 
 ## Success Criteria
+- [ ] `READY_TO_CODE` no longer auto-starts coding; execution requires an explicit queue/run action
 - [ ] Users can iterate a coding task with freeform feedback after a partial/blocked run
 - [ ] Coding iterations reuse the existing repo state and task context instead of starting blindly
 - [ ] The post-coding action model is clearer than approve/reject alone
@@ -74,8 +76,9 @@ Add a true coding-iteration workflow to Dash AI so users can respond to partial 
 - Replacing the diff panel could reduce detail unless the summary still links conceptually to the stored diff artifact
 
 ## Open Questions
-1. Should coding iteration return the task to `RUNNING` directly, or pass through a review/requested-changes state first?
-2. Do we want a distinct `BLOCKED` state when the coder identifies an upstream dependency gap?
-3. Should the changed-file summary be generated from the stored diff artifact or from fresh git inspection?
-4. Should raw diff remain accessible behind an advanced toggle, or disappear entirely from the main task view?
-5. How much prior coding output should be replayed into an iteration prompt versus relying on current repo state + user feedback?
+1. After splitting approval from execution, what is the best explicit execution trigger state/action between `READY_TO_CODE` and `RUNNING` (for example `QUEUED`, `START_CODING`, or equivalent)?
+2. Should coding iteration return the task to `RUNNING` directly, or pass through a review/requested-changes state first?
+3. Do we want a distinct `BLOCKED` state when the coder identifies an upstream dependency gap?
+4. Should the changed-file summary be generated from the stored diff artifact or from fresh git inspection?
+5. Should raw diff remain accessible behind an advanced toggle, or disappear entirely from the main task view?
+6. How much prior coding output should be replayed into an iteration prompt versus relying on current repo state + user feedback?

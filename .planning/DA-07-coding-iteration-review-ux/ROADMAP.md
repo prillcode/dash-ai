@@ -12,20 +12,22 @@ Reasoning:
 ## Phases
 
 ### Phase 01: Coding Iteration Workflow and Status Model
-**Status:** 📋 Planned
+**Status:** ✅ Completed
 
 **Goals:**
 - Add a user-facing coding iteration / continue-with-feedback workflow
+- Split plan approval from execution so `READY_TO_CODE` does not auto-run
 - Define the minimum task-state changes needed for iterative coding
 - Persist coding feedback cleanly
 
 **Expected outputs:**
 - Coding iteration API/action design
-- Status model and persistence decisions
+- Status model and persistence decisions, including an explicit pre-run vs queued/run distinction
 - UI feedback form / action entry point plan
 
 **Verification:**
 - A partial coding task can accept follow-up feedback and re-enter coding coherently
+- A task can remain `READY_TO_CODE` without auto-starting until the user explicitly queues/runs it
 
 ---
 
@@ -89,6 +91,8 @@ Reasoning:
 - `packages/client/src/components/timeline/TaskTimelinePanel.tsx`
 
 ## Lightweight Verification Checklist
+- Mark a task `READY_TO_CODE` and confirm it does not auto-start
+- Explicitly queue/start coding and confirm the worker begins only after that action
 - Trigger a coding run that ends with partial progress or a dependency gap
 - Submit follow-up feedback and confirm the task can iterate coding
 - Confirm the next coding run references the same plan/current repo state
@@ -96,4 +100,4 @@ Reasoning:
 - Run `pnpm build`
 
 ## Next Step
-Next step: expand Phase 01 into an executable implementation plan, then continue phase-by-phase.
+Next step: execute Phase 02 to make coding continuation prompts and runner behavior more iteration-aware, then proceed to review UX and diff summary work.
