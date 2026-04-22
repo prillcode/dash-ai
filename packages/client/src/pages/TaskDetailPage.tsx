@@ -113,6 +113,12 @@ export function TaskDetailPage() {
                   <dd className="text-danger">{task.errorMessage}</dd>
                 </div>
               )}
+              {task.codingFeedback && (
+                <div>
+                  <dt className="text-sm text-muted">Latest Coding Feedback</dt>
+                  <dd className="whitespace-pre-wrap">{task.codingFeedback}</dd>
+                </div>
+              )}
               {task.reviewedBy && (
                 <div>
                   <dt className="text-sm text-muted">Reviewed By</dt>

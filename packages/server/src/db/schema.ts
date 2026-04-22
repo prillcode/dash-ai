@@ -57,6 +57,7 @@ export const tasks = sqliteTable("tasks", {
   projectId: text("project_id").references(() => projects.id),
   targetFiles: text("target_files").notNull().default("[]"),
   planFeedback: text("plan_feedback"),
+  codingFeedback: text("coding_feedback"),
   planPath: text("plan_path"),
   sessionId: text("session_id"),
   outputLog: text("output_log"),

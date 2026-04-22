@@ -95,6 +95,25 @@ function renderEventContent(event: TaskEvent): React.ReactNode {
         </div>
       )
     }
+    case "PLAN_FEEDBACK": {
+      const payload = event.payload as { feedback: string }
+      return (
+        <div className="text-sm space-y-1">
+          <div className="font-medium text-accent">Plan feedback submitted</div>
+          <div className="text-muted whitespace-pre-wrap">{payload.feedback}</div>
+        </div>
+      )
+    }
+    case "CODING_FEEDBACK": {
+      const payload = event.payload as { feedback: string; previousStatus: string }
+      return (
+        <div className="text-sm space-y-1">
+          <div className="font-medium text-accent">Coding follow-up queued</div>
+          <div className="text-xs text-subtle">from {payload.previousStatus}</div>
+          <div className="text-muted whitespace-pre-wrap">{payload.feedback}</div>
+        </div>
+      )
+    }
     case "PLANNING_EVENT":
     case "CODING_EVENT": {
       const payload = event.payload as Record<string, unknown>

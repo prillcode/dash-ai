@@ -23,6 +23,7 @@ export interface CodingRunnerInput {
   taskDescription: string
   repoPath: string
   planPath: string
+  codingFeedback?: string | null
   codingPersona: {
     id: string
     name: string
@@ -292,6 +293,15 @@ export async function runCodingSession(
           `Task: ${input.taskTitle}`,
           ``,
           input.taskDescription,
+          ``,
+          input.codingFeedback
+            ? [
+                `This is a follow-up coding iteration. The latest user feedback for this run is:`,
+                input.codingFeedback,
+                ``,
+                `Use the current repository state plus that feedback to continue the work without redoing completed changes.`,
+              ].join("\n")
+            : `This is the initial coding run for the task.`,
           ``,
           `Read the selected execution doc and associated BRIEF.md/ROADMAP.md from the same work item before making changes.`,
           `If the selected execution doc is a PLAN.md, execute that plan. If it is an EXECUTION.md, execute that scaffold.`,

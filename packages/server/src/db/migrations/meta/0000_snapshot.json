@@ -367,6 +367,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "coding_feedback": {
+          "name": "coding_feedback",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "plan_path": {
           "name": "plan_path",
           "type": "text",

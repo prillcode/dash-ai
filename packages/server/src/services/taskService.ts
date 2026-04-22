@@ -109,7 +109,7 @@ export async function createTask(input: TaskInput): Promise<Task> {
 export async function updateTaskStatus(
   id: string,
   status: string,
-  extra?: Partial<Pick<Task, "diffPath" | "outputLog" | "sessionId" | "errorMessage" | "reviewedBy" | "reviewNote" | "startedAt" | "completedAt" | "planFeedback" | "planPath" | "planningPersonaId" | "planningPersonaName">>
+  extra?: Partial<Pick<Task, "diffPath" | "outputLog" | "sessionId" | "errorMessage" | "reviewedBy" | "reviewNote" | "startedAt" | "completedAt" | "planFeedback" | "codingFeedback" | "planPath" | "planningPersonaId" | "planningPersonaName">>
 ): Promise<Task | null> {
   const [row] = await db.update(tasks)
     .set({
@@ -123,18 +123,22 @@ export async function updateTaskStatus(
   return row ? parseTask(row) : null
 }
 
-export async function claimNextReadyTask(): Promise<Task | null> {
+export async function claimNextQueuedTask(): Promise<Task | null> {
+  const queueSessionId = `queued-${generateId()}`
   const [row] = await db.update(tasks)
-    .set({ status: TaskStatus.QUEUED, updatedAt: now() })
+    .set({ sessionId: queueSessionId, updatedAt: now() })
     .where(eq(tasks.id, db
       .select({ id: tasks.id })
       .from(tasks)
-      .where(eq(tasks.status, TaskStatus.READY_TO_CODE))
+      .where(and(
+        eq(tasks.status, TaskStatus.QUEUED),
+        isNull(tasks.sessionId)
+      ))
       .orderBy(asc(tasks.priority), asc(tasks.createdAt))
       .limit(1)
     ))
     .returning()
-  
+
   return row ? parseTask(row) : null
 }
 
@@ -157,11 +161,12 @@ export async function claimNextPlanningTask(): Promise<Task | null> {
   return row ? parseTask(row) : null
 }
 
-// Keep old name as alias for backward compatibility during transition
-export const claimNextPendingTask = claimNextReadyTask
+// Keep old names as aliases for backward compatibility during transition
+export const claimNextReadyTask = claimNextQueuedTask
+export const claimNextPendingTask = claimNextQueuedTask
 
-export async function resetStuckTasks(): Promise<number> {
-  const result = await db.update(tasks)
+export async function resetStuckTasks(): Promise<{ planningResetCount: number; codingResetCount: number }> {
+  const planningResult = await db.update(tasks)
     .set({
       status: TaskStatus.DRAFT,
       sessionId: null,
@@ -169,10 +174,25 @@ export async function resetStuckTasks(): Promise<number> {
       errorMessage: null,
       updatedAt: now(),
     } as Partial<Task>)
-    .where(inArray(tasks.status, [TaskStatus.IN_PLANNING, TaskStatus.QUEUED, TaskStatus.RUNNING]))
+    .where(eq(tasks.status, TaskStatus.IN_PLANNING))
     .returning()
-  
-  return result.length
+
+  const codingResult = await db.update(tasks)
+    .set({
+      status: TaskStatus.READY_TO_CODE,
+      sessionId: null,
+      startedAt: null,
+      completedAt: null,
+      errorMessage: null,
+      updatedAt: now(),
+    } as Partial<Task>)
+    .where(inArray(tasks.status, [TaskStatus.QUEUED, TaskStatus.RUNNING]))
+    .returning()
+
+  return {
+    planningResetCount: planningResult.length,
+    codingResetCount: codingResult.length,
+  }
 }
 
 export async function markTaskFailed(id: string, errorMessage: string): Promise<Task | null> {

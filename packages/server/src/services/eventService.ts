@@ -44,6 +44,11 @@ export interface PlanFeedbackPayload {
   feedback: string
 }
 
+export interface CodingFeedbackPayload {
+  feedback: string
+  previousStatus: string
+}
+
 export type EventPayload =
   | StatusChangePayload
   | ToolCallPayload
@@ -53,6 +58,7 @@ export type EventPayload =
   | PlanningEventPayload
   | CodingEventPayload
   | PlanFeedbackPayload
+  | CodingFeedbackPayload
 
 export type EventType =
   | "STATUS_CHANGE"
@@ -66,6 +72,7 @@ export type EventType =
   | "PLANNING_EVENT"
   | "CODING_EVENT"
   | "PLAN_FEEDBACK"
+  | "CODING_FEEDBACK"
 
 function parseEvent(row: TaskEvent) {
   return {

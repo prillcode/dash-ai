@@ -13,7 +13,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function runTaskSession(task: { id: string; title: string; description: string; repoPath: string; codingPersonaId: string; planPath?: string | null }) {
+async function runTaskSession(task: { id: string; title: string; description: string; repoPath: string; codingPersonaId: string; planPath?: string | null; codingFeedback?: string | null }) {
   const persona = await personaService.getPersona(task.codingPersonaId)
   if (!persona) {
     await taskService.markTaskFailed(task.id, "Coding persona not found")
@@ -30,6 +30,7 @@ async function runTaskSession(task: { id: string; title: string; description: st
         taskDescription: task.description,
         repoPath: task.repoPath,
         planPath: task.planPath || "",
+        codingFeedback: task.codingFeedback,
         codingPersona: {
           id: persona.id,
           name: persona.name,
@@ -50,7 +51,7 @@ async function runTaskSession(task: { id: string; title: string; description: st
     )
 
     const latest = await taskService.getTask(task.id)
-    if (!latest || latest.status === TaskStatus.DRAFT) {
+    if (!latest || latest.status !== TaskStatus.RUNNING) {
       return
     }
 
@@ -138,9 +139,12 @@ export async function startQueueWorker() {
   console.log("Queue worker started")
   console.log(`Max concurrent sessions: ${maxConcurrent}`)
 
-  const resetCount = await taskService.resetStuckTasks()
-  if (resetCount > 0) {
-    console.log(`Reset ${resetCount} stuck tasks (IN_PLANNING, QUEUED, RUNNING) to DRAFT`)
+  const { planningResetCount, codingResetCount } = await taskService.resetStuckTasks()
+  if (planningResetCount > 0) {
+    console.log(`Reset ${planningResetCount} stuck planning task(s) from IN_PLANNING to DRAFT`)
+  }
+  if (codingResetCount > 0) {
+    console.log(`Reset ${codingResetCount} stuck coding task(s) from QUEUED/RUNNING to READY_TO_CODE`)
   }
 
   while (true) {
@@ -162,7 +166,7 @@ export async function startQueueWorker() {
             targetFiles: planningTask.targetFiles as unknown as string[] | undefined,
           }).catch(err => console.error(`Planning task ${planningTask.id} failed:`, err))
         } else {
-          const task = await taskService.claimNextReadyTask()
+          const task = await taskService.claimNextQueuedTask()
 
           if (task) {
             activeCount++

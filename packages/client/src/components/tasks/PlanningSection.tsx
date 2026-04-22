@@ -10,7 +10,6 @@ interface PlanningSectionProps {
   task: Task
 }
 
-const PLANNING_STATES = ["DRAFT", "IN_PLANNING", "PLANNED", "READY_TO_CODE"] as const
 const VALIDATE_STATES = ["IN_PLANNING", "PLANNED", "READY_TO_CODE", "FAILED", "RUNNING"] as const
 
 export function PlanningSection({ task }: PlanningSectionProps) {
@@ -20,17 +19,11 @@ export function PlanningSection({ task }: PlanningSectionProps) {
   const markReadyToCode = useMarkReadyToCode()
   const validateTask = useValidateTask(task.id)
 
-  // Only show for tasks that have or will have a planning persona
-  if (!task.planningPersonaId && !PLANNING_STATES.slice(1).includes(task.status as any)) {
-    return null
-  }
-  // DRAFT without a planning persona = skip entirely
-  if (task.status === "DRAFT" && !task.planningPersonaId) {
+  if (!task.planningPersonaId && !task.planPath) {
     return null
   }
 
-  const showDocViewers =
-    (task.status === "PLANNED" || task.status === "READY_TO_CODE") && !!task.planPath
+  const showDocViewers = task.status !== "IN_PLANNING" && !!task.planPath
 
   return (
     <div className="card p-4 space-y-4">
@@ -63,7 +56,7 @@ export function PlanningSection({ task }: PlanningSectionProps) {
       )}
 
       {task.status === "READY_TO_CODE" && (
-        <p className="text-sm text-muted">Plan approved — in queue for coding.</p>
+        <p className="text-sm text-muted">Plan approved — ready to queue coding when you want to run it.</p>
       )}
 
       {/* Plan doc viewers */}

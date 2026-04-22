@@ -29,6 +29,7 @@ export interface Task {
   repoPath: string
   targetFiles: string[]
   planFeedback: string | null
+  codingFeedback: string | null
   planPath: string | null
   sessionId: string | null
   outputLog: string | null
@@ -74,6 +75,7 @@ export interface TaskEvent {
     | "CODING_EVENT"
     | "AGENT_QUESTION"
     | "PLAN_FEEDBACK"
+    | "CODING_FEEDBACK"
   payload: unknown
   createdAt: string
 }

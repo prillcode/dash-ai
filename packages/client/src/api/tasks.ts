@@ -96,6 +96,21 @@ export function useIteratePlan() {
   })
 }
 
+export function useIterateCoding() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ taskId, feedback }: { taskId: string; feedback: string }) =>
+      apiClient<Task>(`/api/tasks/${taskId}/iterate-coding`, {
+        method: "POST",
+        body: JSON.stringify({ feedback }),
+      }),
+    onSuccess: (task) => {
+      queryClient.invalidateQueries({ queryKey: ["task", task.id] })
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+    },
+  })
+}
+
 export function usePlanDoc(
   taskId: string,
   file: "BRIEF.md" | "ROADMAP.md" | "EXECUTION.md" | "ISSUES.md",
@@ -120,6 +135,20 @@ export function useMarkReadyToCode() {
       apiClient<Task>(`/api/tasks/${taskId}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status: "READY_TO_CODE" }),
+      }),
+    onSuccess: (task) => {
+      queryClient.invalidateQueries({ queryKey: ["task", task.id] })
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+    },
+  })
+}
+
+export function useQueueCoding() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (taskId: string) =>
+      apiClient<Task>(`/api/tasks/${taskId}/queue-coding`, {
+        method: "POST",
       }),
     onSuccess: (task) => {
       queryClient.invalidateQueries({ queryKey: ["task", task.id] })

@@ -44,6 +44,10 @@ const iteratePlanSchema = z.object({
   feedback: z.string().min(1),
 })
 
+const iterateCodingSchema = z.object({
+  feedback: z.string().min(1),
+})
+
 tasksRouter.get("/", async (c) => {
   const filters = {
     status: c.req.query("status"),
@@ -137,7 +141,7 @@ tasksRouter.patch("/:id/status", async (c) => {
   if (parsed.data.status === TaskStatus.READY_TO_CODE) {
     const hasExecutablePlan = await taskService.hasExecutablePlan(existing.repoPath, existing.planPath)
     if (!hasExecutablePlan) {
-      return c.json({ error: "Task cannot start coding until an executable PLAN.md or EXECUTION.md exists in its plan directory" }, 400)
+      return c.json({ error: "Task cannot be marked ready to code until an executable PLAN.md or EXECUTION.md exists in its plan directory" }, 400)
     }
   }
 
@@ -225,6 +229,109 @@ tasksRouter.post("/:id/iterate-plan", async (c) => {
     feedback: parsed.data.feedback,
   })
   
+  return c.json(updated)
+})
+
+tasksRouter.post("/:id/queue-coding", async (c) => {
+  const id = c.req.param("id")
+  const task = await taskService.getTask(id)
+
+  if (!task) {
+    return c.json({ error: "Task not found" }, 404)
+  }
+
+  if (![TaskStatus.DRAFT, TaskStatus.READY_TO_CODE].includes(task.status as any)) {
+    return c.json({ error: `Can only queue coding from DRAFT or READY_TO_CODE. Current: ${task.status}` }, 400)
+  }
+
+  const hasExecutablePlan = await taskService.hasExecutablePlan(task.repoPath, task.planPath)
+  if (!hasExecutablePlan) {
+    return c.json({ error: "Task cannot queue coding until an executable PLAN.md or EXECUTION.md exists in its plan directory" }, 400)
+  }
+
+  const updated = await taskService.updateTaskStatus(id, TaskStatus.QUEUED, {
+    codingFeedback: null,
+    sessionId: null,
+    startedAt: null,
+    completedAt: null,
+    errorMessage: null,
+    reviewedBy: null,
+    reviewNote: null,
+    outputLog: null,
+    diffPath: null,
+  })
+  if (!updated) {
+    return c.json({ error: "Failed to queue coding task" }, 500)
+  }
+
+  await eventService.appendEvent(id, "STATUS_CHANGE", {
+    from: task.status,
+    to: TaskStatus.QUEUED,
+    message: "coding queued by user",
+  })
+
+  await eventService.appendEvent(id, "CODING_EVENT", {
+    status: "queued",
+    message: "Queued coding run",
+  })
+
+  return c.json(updated)
+})
+
+tasksRouter.post("/:id/iterate-coding", async (c) => {
+  const id = c.req.param("id")
+  const body = await c.req.json()
+  const parsed = iterateCodingSchema.safeParse(body)
+
+  if (!parsed.success) {
+    return c.json({ error: "Validation failed", details: parsed.error.issues }, 400)
+  }
+
+  const task = await taskService.getTask(id)
+  if (!task) {
+    return c.json({ error: "Task not found" }, 404)
+  }
+
+  if (![TaskStatus.AWAITING_REVIEW, TaskStatus.FAILED].includes(task.status as any)) {
+    return c.json({ error: `Can only iterate coding from AWAITING_REVIEW or FAILED. Current: ${task.status}` }, 400)
+  }
+
+  const hasExecutablePlan = await taskService.hasExecutablePlan(task.repoPath, task.planPath)
+  if (!hasExecutablePlan) {
+    return c.json({ error: "Task cannot iterate coding until an executable PLAN.md or EXECUTION.md exists in its plan directory" }, 400)
+  }
+
+  const updated = await taskService.updateTaskStatus(id, TaskStatus.QUEUED, {
+    codingFeedback: parsed.data.feedback,
+    sessionId: null,
+    startedAt: null,
+    completedAt: null,
+    errorMessage: null,
+    reviewedBy: null,
+    reviewNote: null,
+    outputLog: null,
+    diffPath: null,
+  })
+  if (!updated) {
+    return c.json({ error: "Failed to queue coding iteration" }, 500)
+  }
+
+  await eventService.appendEvent(id, "STATUS_CHANGE", {
+    from: task.status,
+    to: TaskStatus.QUEUED,
+    message: "coding iteration queued by user",
+  })
+
+  await eventService.appendEvent(id, "CODING_FEEDBACK", {
+    feedback: parsed.data.feedback,
+    previousStatus: task.status,
+  })
+
+  await eventService.appendEvent(id, "CODING_EVENT", {
+    status: "queued",
+    message: "Queued coding follow-up run",
+  })
+
   return c.json(updated)
 })
 
@@ -318,7 +425,7 @@ tasksRouter.post("/:id/cancel", async (c) => {
   const { cancelCodingSession } = await import("../agent/sessionRegistry")
   const wasAborted = task.status === TaskStatus.RUNNING ? cancelCodingSession(id) : false
 
-  const updated = await taskService.updateTaskStatus(id, TaskStatus.DRAFT, {
+  const updated = await taskService.updateTaskStatus(id, TaskStatus.READY_TO_CODE, {
     sessionId: null,
     startedAt: null,
     completedAt: null,
@@ -330,7 +437,7 @@ tasksRouter.post("/:id/cancel", async (c) => {
 
   await eventService.appendEvent(id, "STATUS_CHANGE", {
     from: task.status,
-    to: TaskStatus.DRAFT,
+    to: TaskStatus.READY_TO_CODE,
     message: wasAborted ? "coding session canceled by user" : "queued task canceled by user",
   })
 
